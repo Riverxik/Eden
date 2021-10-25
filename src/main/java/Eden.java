@@ -94,7 +94,7 @@ public class Eden {
 
         @Override
         public String toString() {
-            return String.format("INT[%s][%d:%d]", value, loc.line, loc.column);
+            return String.format("%s[%s][%d:%d]", type, value, loc.line, loc.column);
         }
     }
 
