@@ -53,6 +53,13 @@ public class Eden {
         char c;
         while (i < sourceLen) {
             c = source.charAt(i);
+            if (c == '/' && source.charAt(i+1) == '/') {
+                while (source.charAt(i+1) != '\n') {
+                    i++;
+                    column++;
+                }
+                c = source.charAt(i);
+            }
             if (Character.isWhitespace(c)) {
                 if (c == '\n') {
                     line++;
