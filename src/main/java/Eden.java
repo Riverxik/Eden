@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 /**
  * I will try to make Eden self-hosted as soon as possible, so forgive me for this mess
@@ -11,9 +12,12 @@ import java.util.List;
  * I just started and i see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
+    static List<Token> tokenList = new ArrayList<>();
+    static int tokenIndex = 0;
+    static Stack<Object> stack = new Stack<>();
+
     public static void main(String[] args) throws IOException {
-        String allowedCharacters = "~+-*/;";
-        List<Token> tokenList = new ArrayList<>();
+        String allowedCharacters = "~+-*/;()";
 
         // Args
         if (args.length == 0) {
@@ -74,11 +78,214 @@ public class Eden {
             i++;
             column++;
         }
+        tokenList.add(new Token("END", null, new Location(line, column)));
 
-        // For testing.
-        for (Token t : tokenList) {
-            System.out.println(t.toString());
+        program();
+    }
+
+    static void program() {
+        while (!getCurrent().type.equalsIgnoreCase("END")) {
+            statements();
         }
+    }
+
+    static void statements() {
+        statement();
+        Token current = getCurrent();
+        if (assertToken(current,"CHAR", ";")) {
+            advanceToken();
+        } else {
+            printErr(current, "Expected ';' but found");
+            System.exit(1);
+        }
+    }
+
+    static void statement() {
+        Token current = getCurrent();
+        if (String.valueOf(current.value).equals("~")) {
+            printStatement();
+        } else {
+            System.err.println("Unknown statement");
+            System.exit(1);
+        }
+    }
+
+    static void printStatement() {
+        // ~ expr ;
+        Token current = getCurrent();
+        if (assertToken(current, "CHAR", "~")) {
+            advanceToken();
+            expression();
+        } else {
+            printErr(current, "Print statement should starts with '~'");
+        }
+        // print
+        System.out.println(stack.pop());
+    }
+
+    static void expression() {
+        part();
+        sum();
+        //logical();
+        //keyword {read}
+    }
+
+    static void part() {
+        unary();
+    }
+
+    static void sum() {
+        Token current = getCurrent();
+        if (assertToken(current, "CHAR", "+")) {
+            advanceToken();
+            part();
+            opPlus();
+            sum();
+        }
+        if (assertToken(current, "CHAR", "-")) {
+            advanceToken();
+            part();
+            opMinus();
+            sum();
+        }
+    }
+
+    static void unary() {
+        boolean isPositive = true;
+        Token current = getCurrent();
+        if (assertToken(current, "CHAR", "+") || assertToken(current, "CHAR", "-")) {
+            if (String.valueOf(current.value).equalsIgnoreCase("-")) {
+                isPositive = false;
+            }
+            advanceToken();
+        }
+        arg(isPositive);
+        starSlash();
+    }
+
+    static void starSlash() {
+        Token current = getCurrent();
+        if (String.valueOf(current.value).equalsIgnoreCase("*")) {
+            advanceToken();
+            unary();
+            opStar();
+            starSlash();
+        }
+        if (String.valueOf(current.value).equalsIgnoreCase("/")) {
+            advanceToken();
+            unary();
+            opSlash();
+            starSlash();
+        }
+        // TODO: ^ op?
+//        if (String.valueOf(current.value).equalsIgnoreCase("^")) {
+//            opPower();
+//            starSlash();
+//        }
+    }
+
+    static void arg(boolean isPositive) {
+        Token current = getCurrent();
+        if (current.type.equalsIgnoreCase("INT")) {
+            if (assertToken(current, "INT")) {
+                int tmp = getInt(current.value);
+                int value = isPositive ? tmp : -tmp;
+                stack.push(value);
+                advanceToken();
+            } else {
+                printErr(current, "Expected integer, but found");
+            }
+        }
+        if (current.type.equalsIgnoreCase("CHAR")) {
+            if (assertToken(current, "CHAR", "(")) {
+                advanceToken(); // (
+                expression();
+                current = getCurrent();
+                if (assertToken(current, "CHAR", ")")) {
+                    advanceToken(); // )
+                } else {
+                    printErr(current, "Expression with ( should end with )");
+                    System.exit(1);
+                }
+            }
+        }
+        // TODO: IDENTIFIER, STRING, BOOLEAN?
+    }
+
+    static void opPlus() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            stack.push(_a + _b);
+        } else {
+            printErr(getCurrent(), "Expected two integers, but found");
+        }
+    }
+
+    static void opMinus() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            stack.push(_a - _b);
+        } else {
+            printErr(getCurrent(), "Expected two integers, but found");
+        }
+    }
+
+    static void opStar() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            stack.push(_a * _b);
+        } else {
+            printErr(getCurrent(), "Expected two integers, but found");
+        }
+    }
+
+    static void opSlash() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            stack.push(_a / _b);
+        } else {
+            printErr(getCurrent(), "Expected two integers, but found");
+        }
+    }
+
+    static int getInt(Object value) {
+        return Integer.parseInt(String.valueOf(value));
+    }
+
+    static boolean assertToken(Token token, String type, Object value) {
+        return token.type.equalsIgnoreCase(type) && token.value.toString().equals(value.toString());
+    }
+
+    static boolean assertToken(Token token, String type) {
+        return token.type.equalsIgnoreCase(type);
+    }
+
+    static void printErr(Token token, String errMessage) {
+        System.err.printf("[%d:%d] %s: (%s)'%s'%n", token.loc.line, token.loc.column, errMessage, token.type, token.value);
+    }
+
+    static void advanceToken() {
+        if (tokenIndex < tokenList.size()) {
+            tokenIndex++;
+        } else {
+            printErr(tokenList.get(tokenList.size()-1), "Can't advance the next token.");
+        }
+    }
+
+    static Token getCurrent() {
+        return tokenList.get(tokenIndex);
     }
 
     static class Token {
