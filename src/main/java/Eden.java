@@ -17,7 +17,7 @@ public class Eden {
     static Stack<Object> stack = new Stack<>();
 
     public static void main(String[] args) throws IOException {
-        String allowedCharacters = "~+-*/;()";
+        String allowedCharacters = "~+-*/;()=><";
 
         // Args
         if (args.length == 0) {
@@ -126,7 +126,7 @@ public class Eden {
     static void expression() {
         part();
         sum();
-        //logical();
+        logical();
         //keyword {read}
     }
 
@@ -147,6 +147,28 @@ public class Eden {
             part();
             opMinus();
             sum();
+        }
+    }
+
+    static void logical() {
+        Token current = getCurrent();
+        if (assertToken(current, "CHAR", ">")) {
+            advanceToken();
+            part();
+            sum();
+            opMore();
+        }
+        if (assertToken(current, "CHAR", "<")) {
+            advanceToken();
+            part();
+            sum();
+            opLess();
+        }
+        if (assertToken(current, "CHAR", "=")) {
+            advanceToken();
+            part();
+            sum();
+            opEqual();
         }
     }
 
@@ -212,7 +234,7 @@ public class Eden {
         // TODO: IDENTIFIER, STRING, BOOLEAN?
     }
 
-    static void opPlus() {
+    static void opPlus() { // TODO: Check the stack to be valid for all ops
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -257,6 +279,48 @@ public class Eden {
             stack.push(_a / _b);
         } else {
             printErr(getCurrent(), "Expected two integers, but found");
+        }
+    }
+
+    static void opMore() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            int value = _a > _b ? 1 : 0;
+            stack.push(value);
+        } else {
+            printErr(getCurrent(), "More operation supports only integer for now");
+            System.exit(1);
+        }
+    }
+
+    static void opLess() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            int value = _a < _b ? 1 : 0;
+            stack.push(value);
+        } else {
+            printErr(getCurrent(), "Less operation supports only integer for now");
+            System.exit(1);
+        }
+    }
+
+    static void opEqual() {
+        Object b = stack.pop();
+        Object a = stack.pop();
+        if (a instanceof Integer && b instanceof Integer) {
+            int _a = getInt(a);
+            int _b = getInt(b);
+            int value = _a == _b ? 1 : 0;
+            stack.push(value);
+        } else {
+            printErr(getCurrent(), "Equal operation supports only integer for now");
+            System.exit(1);
         }
     }
 
