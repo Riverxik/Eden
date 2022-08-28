@@ -59,7 +59,7 @@ public class Eden {
     static void statements() {
         statement();
         Token current = getCurrent();
-        if (assertToken(current,TokenType.CHAR, ";")) {
+        if (assertToken(current,TokenType.SEMICOLON)) {
             advanceToken();
         } else {
             printErr(current, "Expected ';' but found");
@@ -80,7 +80,7 @@ public class Eden {
     static void printStatement() {
         // ~ expr ;
         Token current = getCurrent();
-        if (assertToken(current, TokenType.CHAR, "~")) {
+        if (assertToken(current, TokenType.PRINT_STATEMENT)) {
             advanceToken();
             expression();
         } else {
@@ -103,13 +103,13 @@ public class Eden {
 
     static void sum() {
         Token current = getCurrent();
-        if (assertToken(current, TokenType.CHAR, "+")) {
+        if (assertToken(current, TokenType.PLUS)) {
             advanceToken();
             part();
             opPlus();
             sum();
         }
-        if (assertToken(current, TokenType.CHAR, "-")) {
+        if (assertToken(current, TokenType.MINUS)) {
             advanceToken();
             part();
             opMinus();
@@ -119,19 +119,19 @@ public class Eden {
 
     static void logical() {
         Token current = getCurrent();
-        if (assertToken(current, TokenType.CHAR, ">")) {
+        if (assertToken(current, TokenType.GREATER)) {
             advanceToken();
             part();
             sum();
             opMore();
         }
-        if (assertToken(current, TokenType.CHAR, "<")) {
+        if (assertToken(current, TokenType.LESS)) {
             advanceToken();
             part();
             sum();
             opLess();
         }
-        if (assertToken(current, TokenType.CHAR, "=")) {
+        if (assertToken(current, TokenType.EQUALS)) {
             advanceToken();
             part();
             sum();
@@ -142,7 +142,7 @@ public class Eden {
     static void unary() {
         boolean isPositive = true;
         Token current = getCurrent();
-        if (assertToken(current, TokenType.CHAR, "+") || assertToken(current, TokenType.CHAR, "-")) {
+        if (assertToken(current, TokenType.PLUS) || assertToken(current, TokenType.MINUS)) {
             if (String.valueOf(current.value).equalsIgnoreCase("-")) {
                 isPositive = false;
             }
@@ -166,11 +166,12 @@ public class Eden {
             opSlash();
             starSlash();
         }
-        // TODO: ^ op?
-//        if (String.valueOf(current.value).equalsIgnoreCase("^")) {
-//            opPower();
-//            starSlash();
-//        }
+        /* TODO: ^ op?
+        if (String.valueOf(current.value).equalsIgnoreCase("^")) {
+            opPower();
+            starSlash();
+        }
+        */
     }
 
     static void arg(boolean isPositive) {
@@ -186,11 +187,11 @@ public class Eden {
             }
         }
         if (current.type == TokenType.CHAR) {
-            if (assertToken(current, TokenType.CHAR, "(")) {
+            if (assertToken(current, TokenType.OPEN_BRACKET)) {
                 advanceToken(); // (
                 expression();
                 current = getCurrent();
-                if (assertToken(current, TokenType.CHAR, ")")) {
+                if (assertToken(current, TokenType.CLOSE_BRACKET)) {
                     advanceToken(); // )
                 } else {
                     printErr(current, "Expression with ( should end with )");
@@ -323,10 +324,6 @@ public class Eden {
         return Integer.parseInt(String.valueOf(value));
     }
 
-    static boolean assertToken(Token token, TokenType type, Object value) {
-        return token.type == type && token.value.toString().equals(value.toString());
-    }
-
     static boolean assertToken(Token token, TokenType type) {
         return token.type == type;
     }
@@ -349,6 +346,17 @@ public class Eden {
 
     enum TokenType {
         CHAR,
+        SEMICOLON,
+        OPEN_BRACKET,
+        CLOSE_BRACKET,
+        PRINT_STATEMENT,
+        PLUS,
+        MINUS,
+        STAR,
+        DIVIDE,
+        GREATER,
+        LESS,
+        EQUALS,
         NUMBER,
         STRING,
         KEYWORD,
@@ -415,11 +423,13 @@ public class Eden {
             keywordList.add("if");
             keywordList.add("else");
             keywordList.add("while");
+            keywordList.add("true");
+            keywordList.add("false");
         }
 
         void tokenize() {
             while (!isEndOfFile) {
-                char currentChar = peek();
+                currentChar = peek();
                 // White spaces.
                 if (Character.isWhitespace(currentChar)) {
                     column++;
@@ -437,12 +447,7 @@ public class Eden {
                 }
                 if (!Character.isLetter(currentChar)) {
                     // Characters.
-                    if (allowedCharacters.indexOf(currentChar) == -1) {
-                        printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Character is not allowed");
-                        System.exit(1);
-                    }
-                    next();
-                    tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
+                    tokenizeCharacter();
                 } else {
                     // Strings.
                     tokenizeString();
@@ -474,6 +479,63 @@ public class Eden {
             } else {
                 tokenList.add(new Token(TokenType.STRING, tokenValue, new Location(line, column)));
             }
+        }
+
+        void tokenizeCharacter() {
+            if (allowedCharacters.indexOf(currentChar) == -1) {
+                printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Character is not allowed");
+                System.exit(1);
+            }
+            switch (currentChar) {
+                case ';': {
+                    tokenList.add(new Token(TokenType.SEMICOLON, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '(': {
+                    tokenList.add(new Token(TokenType.OPEN_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case ')': {
+                    tokenList.add(new Token(TokenType.CLOSE_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '~': {
+                    tokenList.add(new Token(TokenType.PRINT_STATEMENT, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '+': {
+                    tokenList.add(new Token(TokenType.PLUS, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '-': {
+                    tokenList.add(new Token(TokenType.MINUS, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '*': {
+                    tokenList.add(new Token(TokenType.STAR, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '/': {
+                    tokenList.add(new Token(TokenType.DIVIDE, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '>': {
+                    tokenList.add(new Token(TokenType.GREATER, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '<': {
+                    tokenList.add(new Token(TokenType.LESS, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '=': {
+                    tokenList.add(new Token(TokenType.EQUALS, currentChar, new Location(line, column)));
+                    break;
+                }
+                default: {
+                    tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
+                }
+            }
+            next();
         }
 
         void next() {
