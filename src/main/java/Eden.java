@@ -17,8 +17,6 @@ public class Eden {
     static Stack<Object> stack = new Stack<>();
 
     public static void main(String[] args) throws IOException {
-        String allowedCharacters = "~+-*/;()=><";
-
         // Args
         if (args.length == 0) {
             System.out.println("Usage: eden -s scrName.eden");
@@ -46,52 +44,14 @@ public class Eden {
         String source = new String(Files.readAllBytes(Paths.get(sourceName)), StandardCharsets.UTF_8);
 
         // Lexing.
-        int sourceLen = source.length();
-        i = 0;
-        int line = 1;
-        int column = 1;
-        char c;
-        while (i < sourceLen) {
-            c = source.charAt(i);
-            if (c == '/' && source.charAt(i+1) == '/') {
-                while (source.charAt(i+1) != '\n') {
-                    i++;
-                    column++;
-                }
-                c = source.charAt(i);
-            }
-            if (Character.isWhitespace(c)) {
-                if (c == '\n') {
-                    line++;
-                    column = 1;
-                }
-            } else if (Character.isDigit(c)) {
-                StringBuilder sb = new StringBuilder();
-                while (Character.isDigit(c)) {
-                    sb.append(c);
-                    i++;
-                    column++;
-                    c = source.charAt(i);
-                }
-                i--;
-                column--;
-                tokenList.add(new Token("INT", sb.toString(), new Location(line, column)));
-            } else if (allowedCharacters.indexOf(c) != -1) {
-                tokenList.add(new Token("CHAR", c, new Location(line, column)));
-            } else {
-                System.err.printf("Unknown char: '%c'", c);
-                System.exit(1);
-            }
-            i++;
-            column++;
-        }
-        tokenList.add(new Token("END", null, new Location(line, column)));
+        Lexer lexer = new Lexer(source, tokenList);
+        lexer.tokenize();
 
         program();
     }
 
     static void program() {
-        while (!getCurrent().type.equalsIgnoreCase("END")) {
+        while (getCurrent().type != TokenType.END) {
             statements();
         }
     }
@@ -99,7 +59,7 @@ public class Eden {
     static void statements() {
         statement();
         Token current = getCurrent();
-        if (assertToken(current,"CHAR", ";")) {
+        if (assertToken(current,TokenType.CHAR, ";")) {
             advanceToken();
         } else {
             printErr(current, "Expected ';' but found");
@@ -112,7 +72,7 @@ public class Eden {
         if (String.valueOf(current.value).equals("~")) {
             printStatement();
         } else {
-            System.err.println("Unknown statement");
+            printErr(current, "Unknown statement");
             System.exit(1);
         }
     }
@@ -120,7 +80,7 @@ public class Eden {
     static void printStatement() {
         // ~ expr ;
         Token current = getCurrent();
-        if (assertToken(current, "CHAR", "~")) {
+        if (assertToken(current, TokenType.CHAR, "~")) {
             advanceToken();
             expression();
         } else {
@@ -143,13 +103,13 @@ public class Eden {
 
     static void sum() {
         Token current = getCurrent();
-        if (assertToken(current, "CHAR", "+")) {
+        if (assertToken(current, TokenType.CHAR, "+")) {
             advanceToken();
             part();
             opPlus();
             sum();
         }
-        if (assertToken(current, "CHAR", "-")) {
+        if (assertToken(current, TokenType.CHAR, "-")) {
             advanceToken();
             part();
             opMinus();
@@ -159,19 +119,19 @@ public class Eden {
 
     static void logical() {
         Token current = getCurrent();
-        if (assertToken(current, "CHAR", ">")) {
+        if (assertToken(current, TokenType.CHAR, ">")) {
             advanceToken();
             part();
             sum();
             opMore();
         }
-        if (assertToken(current, "CHAR", "<")) {
+        if (assertToken(current, TokenType.CHAR, "<")) {
             advanceToken();
             part();
             sum();
             opLess();
         }
-        if (assertToken(current, "CHAR", "=")) {
+        if (assertToken(current, TokenType.CHAR, "=")) {
             advanceToken();
             part();
             sum();
@@ -182,7 +142,7 @@ public class Eden {
     static void unary() {
         boolean isPositive = true;
         Token current = getCurrent();
-        if (assertToken(current, "CHAR", "+") || assertToken(current, "CHAR", "-")) {
+        if (assertToken(current, TokenType.CHAR, "+") || assertToken(current, TokenType.CHAR, "-")) {
             if (String.valueOf(current.value).equalsIgnoreCase("-")) {
                 isPositive = false;
             }
@@ -215,8 +175,8 @@ public class Eden {
 
     static void arg(boolean isPositive) {
         Token current = getCurrent();
-        if (current.type.equalsIgnoreCase("INT")) {
-            if (assertToken(current, "INT")) {
+        if (current.type == TokenType.NUMBER) {
+            if (assertToken(current, TokenType.NUMBER)) {
                 int tmp = getInt(current.value);
                 int value = isPositive ? tmp : -tmp;
                 stack.push(value);
@@ -225,12 +185,12 @@ public class Eden {
                 printErr(current, "Expected integer, but found");
             }
         }
-        if (current.type.equalsIgnoreCase("CHAR")) {
-            if (assertToken(current, "CHAR", "(")) {
+        if (current.type == TokenType.CHAR) {
+            if (assertToken(current, TokenType.CHAR, "(")) {
                 advanceToken(); // (
                 expression();
                 current = getCurrent();
-                if (assertToken(current, "CHAR", ")")) {
+                if (assertToken(current, TokenType.CHAR, ")")) {
                     advanceToken(); // )
                 } else {
                     printErr(current, "Expression with ( should end with )");
@@ -335,16 +295,16 @@ public class Eden {
         return Integer.parseInt(String.valueOf(value));
     }
 
-    static boolean assertToken(Token token, String type, Object value) {
-        return token.type.equalsIgnoreCase(type) && token.value.toString().equals(value.toString());
+    static boolean assertToken(Token token, TokenType type, Object value) {
+        return token.type == type && token.value.toString().equals(value.toString());
     }
 
-    static boolean assertToken(Token token, String type) {
-        return token.type.equalsIgnoreCase(type);
+    static boolean assertToken(Token token, TokenType type) {
+        return token.type == type;
     }
 
     static void printErr(Token token, String errMessage) {
-        System.err.printf("[%d:%d] %s: (%s)'%s'%n", token.loc.line, token.loc.column, errMessage, token.type, token.value);
+        System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line, token.loc.column, errMessage, token.type, token.value);
     }
 
     static void advanceToken() {
@@ -359,12 +319,20 @@ public class Eden {
         return tokenList.get(tokenIndex);
     }
 
+    enum TokenType {
+        CHAR,
+        NUMBER,
+        STRING,
+        KEYWORD,
+        END
+    }
+
     static class Token {
-        String type;
+        TokenType type;
         Object value;
         Location loc;
 
-        Token(String type, Object value, Location loc) {
+        Token(TokenType type, Object value, Location loc) {
             this.type = type;
             this.value = value;
             this.loc = loc;
@@ -383,6 +351,114 @@ public class Eden {
         Location(int line, int column) {
             this.line = line;
             this.column = column;
+        }
+    }
+
+    static class Lexer {
+        String allowedCharacters = "~+-*/;()=><!{}().'\"";
+        String source;
+        List<Token> tokenList;
+        List<String> keywordList;
+        int sourceLength;
+        int currentCharIndex;
+        int line;
+        int column;
+        boolean isEndOfFile;
+        char currentChar;
+
+        Lexer(String source, List<Token> tokenList) {
+            this.source = source;
+            this.sourceLength = source.length();
+            this.tokenList = tokenList;
+            this.currentCharIndex = 0;
+            this.line = 0;
+            this.column = 0;
+            this.isEndOfFile = false;
+            this.keywordList = new ArrayList<>();
+            initKeywords();
+        }
+
+        void initKeywords() {
+            keywordList.add("class");
+            keywordList.add("void");
+            keywordList.add("char");
+            keywordList.add("bool");
+            keywordList.add("int");
+            keywordList.add("if");
+            keywordList.add("else");
+            keywordList.add("while");
+        }
+
+        void tokenize() {
+            while (!isEndOfFile) {
+                char currentChar = peek();
+                // White spaces.
+                if (Character.isWhitespace(currentChar)) {
+                    column++;
+                    if ('\n' == currentChar) {
+                        column = 0;
+                        line++;
+                    }
+                    next();
+                    continue;
+                }
+                // Numbers.
+                if (Character.isDigit(currentChar)) {
+                    tokenizeNumber();
+                    continue;
+                }
+                if (!Character.isLetter(currentChar)) {
+                    // Characters.
+                    if (allowedCharacters.indexOf(currentChar) == -1) {
+                        printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Character is not allowed");
+                        System.exit(1);
+                    }
+                    next();
+                    tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
+                } else {
+                    // Strings.
+                    tokenizeString();
+                }
+            }
+            tokenList.add(new Token(TokenType.END, "End of File", new Location(line, column)));
+        }
+
+        void tokenizeNumber() {
+            StringBuilder sb = new StringBuilder();
+            currentChar = peek();
+            while (!isEndOfFile && Character.isDigit(currentChar)) {
+                sb.append(currentChar);
+                next();
+            }
+            tokenList.add(new Token(TokenType.NUMBER, sb.toString(), new Location(line, column)));
+        }
+
+        void tokenizeString() {
+            StringBuilder sb = new StringBuilder();
+            currentChar = peek();
+            while (!isEndOfFile && Character.isLetter(currentChar)) {
+                sb.append(currentChar);
+                next();
+            }
+            String tokenValue = sb.toString();
+            if (keywordList.contains(tokenValue)) {
+                tokenList.add(new Token(TokenType.KEYWORD, tokenValue, new Location(line, column)));
+            } else {
+                tokenList.add(new Token(TokenType.STRING, tokenValue, new Location(line, column)));
+            }
+        }
+
+        void next() {
+            currentCharIndex++;
+            column++;
+            currentChar = peek();
+        }
+
+        char peek() {
+            if (currentCharIndex == sourceLength - 1) {
+                isEndOfFile = true;
+            }
+            return source.charAt(currentCharIndex);
         }
     }
 }
