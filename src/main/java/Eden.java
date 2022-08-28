@@ -455,10 +455,10 @@ public class Eden {
         }
 
         char peek() {
-            if (currentCharIndex == sourceLength - 1) {
+            if (currentCharIndex == sourceLength) {
                 isEndOfFile = true;
             }
-            return source.charAt(currentCharIndex);
+            return isEndOfFile ? '\0' : source.charAt(currentCharIndex);
         }
     }
 }
