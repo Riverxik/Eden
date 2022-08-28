@@ -201,7 +201,11 @@ public class Eden {
         // TODO: IDENTIFIER, STRING, BOOLEAN?
     }
 
-    static void opPlus() { // TODO: Check the stack to be valid for all ops
+    static void opPlus() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Plus operation needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -214,6 +218,10 @@ public class Eden {
     }
 
     static void opMinus() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Minus operation needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -226,6 +234,10 @@ public class Eden {
     }
 
     static void opStar() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Multiplication operation needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -238,6 +250,10 @@ public class Eden {
     }
 
     static void opSlash() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Dividing operation needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -250,6 +266,10 @@ public class Eden {
     }
 
     static void opMore() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Compare operation '>' needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -264,6 +284,10 @@ public class Eden {
     }
 
     static void opLess() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Compare operation '<' needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
@@ -278,6 +302,10 @@ public class Eden {
     }
 
     static void opEqual() {
+        if (stack.size() < 2) {
+            printErr(getCurrent(), "Compare operation '=' needs two integers, but found");
+            System.exit(1);
+        }
         Object b = stack.pop();
         Object a = stack.pop();
         if (a instanceof Integer && b instanceof Integer) {
