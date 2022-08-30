@@ -20,7 +20,7 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] Variable declarations
 - [ ] Constructors
 - [x] Type: Integer
-- [ ] Type: Boolean
+- [x] Type: Boolean
 - [ ] Type: Char
 - [ ] Type: String
 - [ ] List structure
@@ -62,6 +62,8 @@ int a, b;
 int a = 1;
 int a = 1, b = 2;
 int a = 1, b = 2, c = a + b; // c = 3
+bool isX = true;
+bool isY = 2 = 2; // isY = true
 ```
 
 ## Supported Operations
