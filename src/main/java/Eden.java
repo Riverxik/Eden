@@ -335,6 +335,7 @@ public class Eden {
     enum TokenType {
         CHAR,
         SEMICOLON,
+        COMMA,
         OPEN_BRACKET,
         CLOSE_BRACKET,
         PRINT_STATEMENT,
@@ -379,7 +380,7 @@ public class Eden {
     }
 
     static class Lexer {
-        String allowedCharacters = "~+-*/;()=><!{}().'\"";
+        String allowedCharacters = "~+-*/;()=><!{}().,'\"";
         String source;
         List<Token> tokenList;
         List<String> keywordList;
@@ -518,8 +519,16 @@ public class Eden {
                     tokenList.add(new Token(TokenType.EQUALS, currentChar, new Location(line, column)));
                     break;
                 }
+                case ',': {
+                    tokenList.add(new Token(TokenType.COMMA, currentChar, new Location(line, column)));
+                    break;
+                }
                 default: {
-                    tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
+                    if (Character.isLetter(currentChar)) {
+                        tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
+                    } else {
+                        printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Lexer: Unknown character");
+                    }
                 }
             }
             next();
