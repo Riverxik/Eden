@@ -63,7 +63,6 @@ public class Eden {
             advanceToken();
         } else {
             printErr(current, "Expected ';' but found");
-            System.exit(1);
         }
     }
 
@@ -73,7 +72,6 @@ public class Eden {
             printStatement();
         } else {
             printErr(current, "Unknown statement");
-            System.exit(1);
         }
     }
 
@@ -195,7 +193,6 @@ public class Eden {
                     advanceToken(); // )
                 } else {
                     printErr(current, "Expression with ( should end with )");
-                    System.exit(1);
                 }
             }
         }
@@ -205,7 +202,6 @@ public class Eden {
     static void opPlus() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Plus operation needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -221,7 +217,6 @@ public class Eden {
     static void opMinus() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Minus operation needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -237,7 +232,6 @@ public class Eden {
     static void opStar() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Multiplication operation needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -253,7 +247,6 @@ public class Eden {
     static void opSlash() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Dividing operation needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -269,7 +262,6 @@ public class Eden {
     static void opMore() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Compare operation '>' needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -280,14 +272,12 @@ public class Eden {
             stack.push(value);
         } else {
             printErr(getCurrent(), "More operation supports only integer for now");
-            System.exit(1);
         }
     }
 
     static void opLess() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Compare operation '<' needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -298,14 +288,12 @@ public class Eden {
             stack.push(value);
         } else {
             printErr(getCurrent(), "Less operation supports only integer for now");
-            System.exit(1);
         }
     }
 
     static void opEqual() {
         if (stack.size() < 2) {
             printErr(getCurrent(), "Compare operation '=' needs two integers, but found");
-            System.exit(1);
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -316,7 +304,6 @@ public class Eden {
             stack.push(value);
         } else {
             printErr(getCurrent(), "Equal operation supports only integer for now");
-            System.exit(1);
         }
     }
 
@@ -330,6 +317,7 @@ public class Eden {
 
     static void printErr(Token token, String errMessage) {
         System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line, token.loc.column, errMessage, token.type, token.value);
+        System.exit(1);
     }
 
     static void advanceToken() {
@@ -483,8 +471,7 @@ public class Eden {
 
         void tokenizeCharacter() {
             if (allowedCharacters.indexOf(currentChar) == -1) {
-                printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Character is not allowed");
-                System.exit(1);
+                printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Lexer: Character is not allowed");
             }
             switch (currentChar) {
                 case ';': {
