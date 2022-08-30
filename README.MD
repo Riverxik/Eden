@@ -46,6 +46,24 @@ Examples:
 ~ -1;
 ```
 
+#### Variable definition and assignment
+
+Defines a variable with different types and assign value to it.
+
+Syntax:
+```
+<type> <variableName>[[= <expression>], <anotherVariableName>];
+```
+
+Examples:
+```
+int a;
+int a, b;
+int a = 1;
+int a = 1, b = 2;
+int a = 1, b = 2, c = a + b; // c = 3
+```
+
 ## Supported Operations
 
 #### Addition
