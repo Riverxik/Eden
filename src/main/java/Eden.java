@@ -457,7 +457,8 @@ public class Eden {
     }
 
     static void printErr(Token token, String errMessage) {
-        System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line, token.loc.column, errMessage, token.type, token.value);
+        int offset = String.valueOf(token.value).length();
+        System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, errMessage, token.type, token.value);
         System.exit(1);
     }
 
