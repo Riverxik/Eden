@@ -294,6 +294,18 @@ public class Eden {
                 printErr(current, "Undefined variable");
             }
         }
+        if (assertToken(current, TokenType.KEYWORD)) {
+            // true or false
+            String value = String.valueOf(current.value);
+            if ("true".equalsIgnoreCase(value)) {
+                stack.push(1);
+            } else if ("false".equalsIgnoreCase(value)) {
+                stack.push(0);
+            } else {
+                printErr(current, "Expected boolean but found");
+            }
+            advanceToken();
+        }
         // TODO: STRING, BOOLEAN?
     }
 
@@ -303,6 +315,19 @@ public class Eden {
                 if (rawValue instanceof Integer) {
                     int value = (int) rawValue;
                     stack.push(value);
+                } else {
+                    printErr(getCurrent(), "Expected integer value but found");
+                }
+                break;
+            }
+            case BOOL: {
+                if (rawValue instanceof Integer) {
+                    int value = (int) rawValue;
+                    if (value == 1) {
+                        stack.push(value);
+                    } else {
+                        stack.push(0);
+                    }
                 } else {
                     printErr(getCurrent(), "Expected integer value but found");
                 }

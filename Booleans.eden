@@ -1,0 +1,9 @@
+int a = -1, b = 4;
+bool isX;
+bool isY = true;
+isX = (a = -1) = (b - 3);
+~ isX;
+isX = -1;
+~ isX;
+~ isY;
+~ isX = false;
