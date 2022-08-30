@@ -2,9 +2,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * I will try to make Eden self-hosted as soon as possible, so forgive me for this mess
@@ -15,6 +13,8 @@ public class Eden {
     static List<Token> tokenList = new ArrayList<>();
     static int tokenIndex = 0;
     static Stack<Object> stack = new Stack<>();
+    static Map<String, EdenType> variableMap = new HashMap<>();
+    static Map<String, Object> variableValue = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         // Args
@@ -68,10 +68,94 @@ public class Eden {
 
     static void statement() {
         Token current = getCurrent();
-        if (String.valueOf(current.value).equals("~")) {
+        if (assertToken(current, TokenType.PRINT_STATEMENT)) {
             printStatement();
+        } else if (assertToken(current, TokenType.KEYWORD)) {
+            keywordStatement();
+        } else if (assertToken(current, TokenType.STRING)) {
+            valueAssignment();
         } else {
             printErr(current, "Unknown statement");
+        }
+    }
+
+    static void keywordStatement() {
+        Token current = getCurrent();
+        String tokenValue = String.valueOf(current.value);
+        switch (tokenValue) {
+            case "int": {
+                defineVariable(EdenType.INT);
+                break;
+            }
+            case "bool": {
+                defineVariable(EdenType.BOOL);
+                break;
+            }
+            case "char": {
+                defineVariable(EdenType.CHAR);
+                break;
+            }
+            default: {
+                printErr(current, "Unknown keyword");
+            }
+        }
+    }
+
+    static void defineVariable(EdenType defineType) {
+        advanceToken();
+        Token current = getCurrent();
+        if (assertToken(current, TokenType.STRING)) {
+            String variableName = String.valueOf(current.value);
+            checkVariableNameAndAddToMap(variableName, defineType);
+            valueAssignment();
+            if (assertToken(current, TokenType.COMMA)) {
+                defineVariable(defineType);
+            }
+        } else {
+            printErr(current, "Expected variable name but found");
+        }
+    }
+
+    static void checkVariableNameAndAddToMap(String variableName, EdenType tokenType) {
+        Token current = getCurrent();
+        if (variableName.length() < 1) {
+            printErr(current, "Variable name must contain at least one symbol");
+        }
+        if (!Character.isLetter(variableName.charAt(0))) {
+            printErr(current, "Variable name must starts with the letter");
+        }
+        if (!Character.isLowerCase(variableName.charAt(0))) {
+            printErr(current, "Variable name must starts with the lower case letter");
+        }
+        if (variableMap.containsKey(variableName)) {
+            String error = String.format("Variable name %s is already defined", variableName);
+            printErr(current, error);
+        }
+        variableMap.put(variableName, tokenType);
+    }
+
+    static void valueAssignment() {
+        Token current = getCurrent();
+        String variableName = String.valueOf(current.value);
+        if (variableMap.containsKey(variableName)) {
+            advanceToken();
+            current = getCurrent();
+            if (assertToken(current, TokenType.EQUALS)) {
+                EdenType variableType = variableMap.get(variableName);
+                initializeVariable(variableName, variableType);
+            }
+        } else {
+            printErr(current, "Variable is not defined");
+        }
+    }
+
+    static void initializeVariable(String variableName, EdenType variableType) {
+        advanceToken();
+        expression();
+        Object value = stack.pop();
+        variableValue.put(variableName, value);
+        if (assertToken(getCurrent(), TokenType.COMMA)) {
+            defineVariable(variableType);
         }
     }
 
@@ -184,19 +268,51 @@ public class Eden {
                 printErr(current, "Expected integer, but found");
             }
         }
-        if (current.type == TokenType.CHAR) {
-            if (assertToken(current, TokenType.OPEN_BRACKET)) {
-                advanceToken(); // (
-                expression();
-                current = getCurrent();
-                if (assertToken(current, TokenType.CLOSE_BRACKET)) {
-                    advanceToken(); // )
-                } else {
-                    printErr(current, "Expression with ( should end with )");
-                }
+        if (assertToken(current, TokenType.OPEN_BRACKET)) {
+            advanceToken(); // (
+            expression();
+            current = getCurrent();
+            if (assertToken(current, TokenType.CLOSE_BRACKET)) {
+                advanceToken(); // )
+            } else {
+                printErr(current, "Expected close bracket but found");
             }
         }
-        // TODO: IDENTIFIER, STRING, BOOLEAN?
+        if (assertToken(current, TokenType.STRING)) {
+            // IDENTIFIER
+            String variableName = String.valueOf(current.value);
+            if (variableMap.containsKey(variableName)) {
+                if (variableValue.containsKey(variableName)) {
+                    EdenType type = variableMap.get(variableName);
+                    Object rawValue = variableValue.get(variableName);
+                    setValueFromIdentifier(rawValue, type);
+                    advanceToken();
+                } else {
+                    printErr(current, "Variable is not initialized");
+                }
+            } else {
+                printErr(current, "Undefined variable");
+            }
+        }
+        // TODO: STRING, BOOLEAN?
+    }
+
+    static void setValueFromIdentifier(Object rawValue, EdenType variableType) {
+        switch (variableType) {
+            case INT: {
+                if (rawValue instanceof Integer) {
+                    int value = (int) rawValue;
+                    stack.push(value);
+                } else {
+                    printErr(getCurrent(), "Expected integer value but found");
+                }
+                break;
+            }
+            default: {
+                String error = String.format("variableType %s is not implemented", variableType);
+                printErr(getCurrent(), error);
+            }
+        }
     }
 
     static void opPlus() {
@@ -330,6 +446,12 @@ public class Eden {
 
     static Token getCurrent() {
         return tokenList.get(tokenIndex);
+    }
+
+    enum EdenType {
+        INT,
+        CHAR,
+        BOOL
     }
 
     enum TokenType {
