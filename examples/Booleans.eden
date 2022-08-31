@@ -1,0 +1,9 @@
+int a = -1, b = 4;
+bool isX;
+bool isY = true;
+isX = (a = -1) = (b - 3);   // Yes you can use = in expressions for now
+~ isX;                      // This will return true (1)
+isX = -1;                   // All is false but 1
+~ isX;                      // False (0)
+~ isY;                      // Obviously it is true
+~ isX = false;              // This also will return 1
