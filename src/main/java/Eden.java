@@ -13,8 +13,8 @@ public class Eden {
     static List<Token> tokenList = new ArrayList<>();
     static int tokenIndex = 0;
     static Stack<Object> stack = new Stack<>();
-    static Map<String, EdenType> variableMap = new HashMap<>();
-    static Map<String, Object> variableValue = new HashMap<>();
+    static List<Scope> scopeList = new ArrayList<>();
+    static int scopeLevel = 0;
 
     public static void main(String[] args) throws IOException {
         // Args
@@ -52,7 +52,32 @@ public class Eden {
     }
 
     static void program() {
+        scopeList.add(new Scope());
         while (getCurrent().type != TokenType.END) {
+            blockStatements();
+        }
+    }
+
+    static void blockStatements() {
+        Token current = getCurrent();
+        if (assertToken(current, TokenType.OPEN_CURLY_BRACKET)) {
+            advanceToken();
+            scopeList.add(new Scope());
+            scopeLevel++;
+            // START BLOCK.
+            while (!assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET) && !assertToken(getCurrent(), TokenType.END)) {
+                blockStatements();
+            }
+            // CLOSE BLOCK.
+            current = getCurrent();
+            if (assertToken(current, TokenType.CLOSE_CURLY_BRACKET)) {
+                advanceToken();
+                scopeList.remove(scopeLevel);
+                scopeLevel--;
+            } else {
+                printErr(current, "Block statement must close with curly bracket '}' but found");
+            }
+        } else {
             statements();
         }
     }
@@ -128,21 +153,21 @@ public class Eden {
         if (!Character.isLowerCase(variableName.charAt(0))) {
             printErr(current, "Variable name must starts with the lower case letter");
         }
-        if (variableMap.containsKey(variableName)) {
+        if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             String error = String.format("Variable name %s is already defined", variableName);
             printErr(current, error);
         }
-        variableMap.put(variableName, tokenType);
+        scopeList.get(scopeLevel).variableMap.put(variableName, tokenType);
     }
 
     static void valueAssignment() {
         Token current = getCurrent();
         String variableName = String.valueOf(current.value);
-        if (variableMap.containsKey(variableName)) {
+        if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             advanceToken();
             current = getCurrent();
             if (assertToken(current, TokenType.EQUALS)) {
-                EdenType variableType = variableMap.get(variableName);
+                EdenType variableType = scopeList.get(scopeLevel).variableMap.get(variableName);
                 initializeVariable(variableName, variableType);
             }
         } else {
@@ -154,7 +179,7 @@ public class Eden {
         advanceToken();
         expression();
         Object value = stack.pop();
-        variableValue.put(variableName, value);
+        scopeList.get(scopeLevel).variableValue.put(variableName, value);
         if (assertToken(getCurrent(), TokenType.COMMA)) {
             defineVariable(variableType);
         }
@@ -282,10 +307,10 @@ public class Eden {
         if (assertToken(current, TokenType.STRING)) {
             // IDENTIFIER
             String variableName = String.valueOf(current.value);
-            if (variableMap.containsKey(variableName)) {
-                if (variableValue.containsKey(variableName)) {
-                    EdenType type = variableMap.get(variableName);
-                    Object rawValue = variableValue.get(variableName);
+            if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
+                if (scopeList.get(scopeLevel).variableValue.containsKey(variableName)) {
+                    EdenType type = scopeList.get(scopeLevel).variableMap.get(variableName);
+                    Object rawValue = scopeList.get(scopeLevel).variableValue.get(variableName);
                     setValueFromIdentifier(rawValue, type);
                     advanceToken();
                 } else {
@@ -475,6 +500,11 @@ public class Eden {
         return tokenList.get(tokenIndex);
     }
 
+    static class Scope {
+        Map<String, EdenType> variableMap = new HashMap<>();
+        Map<String, Object> variableValue = new HashMap<>();
+    }
+
     enum EdenType {
         INT,
         CHAR,
@@ -487,6 +517,8 @@ public class Eden {
         COMMA,
         OPEN_BRACKET,
         CLOSE_BRACKET,
+        OPEN_CURLY_BRACKET,
+        CLOSE_CURLY_BRACKET,
         PRINT_STATEMENT,
         PLUS,
         MINUS,
@@ -650,6 +682,14 @@ public class Eden {
                 }
                 case ')': {
                     tokenList.add(new Token(TokenType.CLOSE_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '{': {
+                    tokenList.add(new Token(TokenType.OPEN_CURLY_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '}': {
+                    tokenList.add(new Token(TokenType.CLOSE_CURLY_BRACKET, currentChar, new Location(line, column)));
                     break;
                 }
                 case '~': {
