@@ -1,0 +1,6 @@
+// Single line comment
+// Another line comment
+// Obviously i have to implement multiline comments but it is okay for now
+int a = 1; // The same here
+~ a; // This will return 1
+// Hello ;>

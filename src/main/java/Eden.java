@@ -46,6 +46,7 @@ public class Eden {
         // Lexing.
         Lexer lexer = new Lexer(source, tokenList);
         lexer.tokenize();
+        lexer.clearComments();
 
         program();
     }
@@ -562,6 +563,22 @@ public class Eden {
             keywordList.add("while");
             keywordList.add("true");
             keywordList.add("false");
+        }
+
+        void clearComments() {
+            List<Token> comments = new ArrayList<>();
+            int commentLine = -1;
+            for (int i = 0, tokenListSize = tokenList.size() - 1; i < tokenListSize; i++) {
+                Token token = tokenList.get(i);
+                Token nextToken = tokenList.get(i + 1);
+                if (token.type == TokenType.DIVIDE && nextToken.type == TokenType.DIVIDE) {
+                    commentLine = token.loc.line;
+                }
+                if (token.loc.line == commentLine) {
+                    comments.add(token);
+                }
+            }
+            tokenList.removeAll(comments);
         }
 
         void tokenize() {
