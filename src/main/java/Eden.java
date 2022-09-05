@@ -62,38 +62,31 @@ public class Eden {
     }
 
     static void specialBlockStatements() {
-        String value = String.valueOf(currentToken.value);
-        switch (value) {
-            case "if": {
-                ifStatement();
-                break;
-            }
-            default: {
-                blockStatements(true);
-            }
+        if (assertKeyWord("if")) {
+            ifStatement();
+        } else {
+            blockStatements(true);
         }
     }
 
     static void blockStatements(boolean isNewScope) {
-        if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
-            advanceToken();
+        if (assertTokenAndAdvance(TokenType.OPEN_CURLY_BRACKET)) {
             if (isNewScope) {
                 scopeList.add(new Scope());
                 scopeLevel++;
             }
             // START BLOCK.
-            while (!assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET) && !assertToken(currentToken, TokenType.END)) {
+            while (!assertToken(TokenType.CLOSE_CURLY_BRACKET) && !assertToken(TokenType.END)) {
                 specialBlockStatements();
             }
             // CLOSE BLOCK.
-            if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
-                advanceToken();
+            if (assertTokenAndAdvance(TokenType.CLOSE_CURLY_BRACKET)) {
                 if (isNewScope) {
                     scopeList.remove(scopeLevel);
                     scopeLevel--;
                 }
             } else {
-                printErr(currentToken, "Block statement must close with curly bracket '}' but found");
+                printErrCurrentToken("Block statement must close with curly bracket '}' but found");
             }
         } else {
             statements();
@@ -102,127 +95,114 @@ public class Eden {
 
     static void statements() {
         statement();
-        if (assertToken(currentToken,TokenType.SEMICOLON)) {
+        if (assertToken(TokenType.SEMICOLON)) {
             advanceToken();
         } else {
-            printErr(currentToken, "Expected ';' but found");
+            printErrCurrentToken("Expected ';' but found");
         }
     }
 
     static void statement() {
-        if (assertToken(currentToken, TokenType.PRINT_STATEMENT)) {
+        if (assertToken(TokenType.PRINT_STATEMENT)) {
             printStatement();
-        } else if (assertToken(currentToken, TokenType.KEYWORD)) {
+        } else if (assertToken(TokenType.KEYWORD)) {
             keywordStatement();
-        } else if (assertToken(currentToken, TokenType.STRING)) {
+        } else if (assertToken(TokenType.STRING)) {
             valueAssignment();
         } else {
-            printErr(currentToken, "Unknown statement");
+            printErrCurrentToken("Unknown statement");
         }
     }
 
     static void keywordStatement() {
-        String tokenValue = String.valueOf(currentToken.value);
-        switch (tokenValue) {
-            case "int": {
-                defineVariable(EdenType.INT);
-                break;
-            }
-            case "bool": {
-                defineVariable(EdenType.BOOL);
-                break;
-            }
-            case "char": {
-                defineVariable(EdenType.CHAR);
-                break;
-            }
-            default: {
-                printErr(currentToken, "Unknown keyword");
-            }
+        if (assertKeyWord("int")) {
+            defineVariable(EdenType.INT);
+        } else if (assertKeyWord("bool")) {
+            defineVariable(EdenType.BOOL);
+        } else if (assertKeyWord("char")) {
+            defineVariable(EdenType.CHAR);
+        } else {
+            printErrCurrentToken("Unknown keyword");
         }
     }
 
     static void ifStatement() {
-        advanceToken();
-        if (assertToken(currentToken, TokenType.OPEN_BRACKET)) {
-            advanceToken(); // (
+        if (assertTokenAndAdvance(TokenType.OPEN_BRACKET)) {
             expression();
             int isFirstBlock = Integer.parseInt(String.valueOf(stack.pop()));
-            if (assertToken(currentToken, TokenType.CLOSE_BRACKET)) {
-                advanceToken(); // )
+            if (assertTokenAndAdvance(TokenType.CLOSE_BRACKET)) {
                 if (isFirstBlock == 1) {
                     blockStatements(false);
-                    if (currentToken.type == TokenType.KEYWORD && String.valueOf(currentToken.value).equalsIgnoreCase("else")) {
+                    if (currentToken.type == TokenType.KEYWORD && assertTokenValue("else")) {
                         advanceToken();
                         skipBlock();
                     }
                 } else {
                     skipBlock();
-                    if (currentToken.type == TokenType.KEYWORD && String.valueOf(currentToken.value).equalsIgnoreCase("else")) {
+                    if (currentToken.type == TokenType.KEYWORD && assertTokenValue("else")) {
                         advanceToken();
                         blockStatements(false);
                     }
                 }
             } else {
-                printErr(currentToken, "Expected close bracket ')' but found");
+                printErrCurrentToken("Expected close bracket ')' but found");
             }
         } else {
-            printErr(currentToken, "Expected open bracket '(' but found");
+            printErrCurrentToken("Expected open bracket '(' but found");
         }
     }
 
     static void skipBlock() {
-        if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
+        if (assertToken(TokenType.OPEN_CURLY_BRACKET)) {
             advanceToken();
             int indexBracket = 1;
-            while (indexBracket != 0 && !assertToken(currentToken, TokenType.END)) {
-                if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
+            while (indexBracket != 0 && !assertToken(TokenType.END)) {
+                if (assertToken(TokenType.CLOSE_CURLY_BRACKET)) {
                     indexBracket--;
                 }
-                if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
+                if (assertToken(TokenType.OPEN_CURLY_BRACKET)) {
                     indexBracket++;
                 }
                 if (indexBracket != 0) {
                     advanceToken();
                 }
             }
-            if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
+            if (assertToken(TokenType.CLOSE_CURLY_BRACKET)) {
                 advanceToken();
             } else {
-                printErr(currentToken, "Expected close curly bracket '}' but found");
+                printErrCurrentToken("Expected close curly bracket '}' but found");
             }
         } else {
-            printErr(currentToken, "Expected open curly bracket '{' but found");
+            printErrCurrentToken("Expected open curly bracket '{' but found");
         }
     }
 
     static void defineVariable(EdenType defineType) {
-        advanceToken();
-        if (assertToken(currentToken, TokenType.STRING)) {
+        if (assertToken(TokenType.STRING)) {
             String variableName = String.valueOf(currentToken.value);
             checkVariableNameAndAddToMap(variableName, defineType);
             valueAssignment();
-            if (assertToken(currentToken, TokenType.COMMA)) {
+            if (assertTokenAndAdvance(TokenType.COMMA)) {
                 defineVariable(defineType);
             }
         } else {
-            printErr(currentToken, "Expected variable name but found");
+            printErrCurrentToken("Expected variable name but found");
         }
     }
 
     static void checkVariableNameAndAddToMap(String variableName, EdenType tokenType) {
         if (variableName.length() < 1) {
-            printErr(currentToken, "Variable name must contain at least one symbol");
+            printErrCurrentToken("Variable name must contain at least one symbol");
         }
         if (!Character.isLetter(variableName.charAt(0))) {
-            printErr(currentToken, "Variable name must starts with the letter");
+            printErrCurrentToken("Variable name must starts with the letter");
         }
         if (!Character.isLowerCase(variableName.charAt(0))) {
-            printErr(currentToken, "Variable name must starts with the lower case letter");
+            printErrCurrentToken("Variable name must starts with the lower case letter");
         }
         if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             String error = String.format("Variable name %s is already defined", variableName);
-            printErr(currentToken, error);
+            printErrCurrentToken(error);
         }
         scopeList.get(scopeLevel).variableMap.put(variableName, tokenType);
     }
@@ -231,32 +211,30 @@ public class Eden {
         String variableName = String.valueOf(currentToken.value);
         if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             advanceToken();
-            if (assertToken(currentToken, TokenType.EQUALS)) {
+            if (assertTokenAndAdvance(TokenType.EQUALS)) {
                 EdenType variableType = scopeList.get(scopeLevel).variableMap.get(variableName);
                 initializeVariable(variableName, variableType);
             }
         } else {
-            printErr(currentToken, "Variable is not defined");
+            printErrCurrentToken("Variable is not defined");
         }
     }
 
     static void initializeVariable(String variableName, EdenType variableType) {
-        advanceToken();
         expression();
         Object value = stack.pop();
         scopeList.get(scopeLevel).variableValue.put(variableName, value);
-        if (assertToken(currentToken, TokenType.COMMA)) {
+        if (assertTokenAndAdvance(TokenType.COMMA)) {
             defineVariable(variableType);
         }
     }
 
     static void printStatement() {
         // ~ expr ;
-        if (assertToken(currentToken, TokenType.PRINT_STATEMENT)) {
-            advanceToken();
+        if (assertTokenAndAdvance(TokenType.PRINT_STATEMENT)) {
             expression();
         } else {
-            printErr(currentToken, "Print statement should starts with '~'");
+            printErrCurrentToken("Print statement should starts with '~'");
         }
         // print
         System.out.println(stack.pop());
@@ -274,13 +252,13 @@ public class Eden {
     }
 
     static void sum() {
-        if (assertToken(currentToken, TokenType.PLUS)) {
+        if (assertToken(TokenType.PLUS)) {
             advanceToken();
             part();
             opPlus();
             sum();
         }
-        if (assertToken(currentToken, TokenType.MINUS)) {
+        if (assertToken(TokenType.MINUS)) {
             advanceToken();
             part();
             opMinus();
@@ -289,19 +267,19 @@ public class Eden {
     }
 
     static void logical() {
-        if (assertToken(currentToken, TokenType.GREATER)) {
+        if (assertToken(TokenType.GREATER)) {
             advanceToken();
             part();
             sum();
             opMore();
         }
-        if (assertToken(currentToken, TokenType.LESS)) {
+        if (assertToken(TokenType.LESS)) {
             advanceToken();
             part();
             sum();
             opLess();
         }
-        if (assertToken(currentToken, TokenType.EQUALS)) {
+        if (assertToken(TokenType.EQUALS)) {
             advanceToken();
             part();
             sum();
@@ -311,8 +289,8 @@ public class Eden {
 
     static void unary() {
         boolean isPositive = true;
-        if (assertToken(currentToken, TokenType.PLUS) || assertToken(currentToken, TokenType.MINUS)) {
-            if (String.valueOf(currentToken.value).equalsIgnoreCase("-")) {
+        if (assertToken(TokenType.PLUS) || assertToken(TokenType.MINUS)) {
+            if (assertTokenValue("-")) {
                 isPositive = false;
             }
             advanceToken();
@@ -322,13 +300,13 @@ public class Eden {
     }
 
     static void starSlash() {
-        if (String.valueOf(currentToken.value).equalsIgnoreCase("*")) {
+        if (assertTokenValue("*")) {
             advanceToken();
             unary();
             opStar();
             starSlash();
         }
-        if (String.valueOf(currentToken.value).equalsIgnoreCase("/")) {
+        if (assertTokenValue("/")) {
             advanceToken();
             unary();
             opSlash();
@@ -344,25 +322,25 @@ public class Eden {
 
     static void arg(boolean isPositive) {
         if (currentToken.type == TokenType.NUMBER) {
-            if (assertToken(currentToken, TokenType.NUMBER)) {
+            if (assertToken(TokenType.NUMBER)) {
                 int tmp = getInt(currentToken.value);
                 int value = isPositive ? tmp : -tmp;
                 stack.push(value);
                 advanceToken();
             } else {
-                printErr(currentToken, "Expected integer, but found");
+                printErrCurrentToken("Expected integer, but found");
             }
         }
-        if (assertToken(currentToken, TokenType.OPEN_BRACKET)) {
+        if (assertToken(TokenType.OPEN_BRACKET)) {
             advanceToken(); // (
             expression();
-            if (assertToken(currentToken, TokenType.CLOSE_BRACKET)) {
+            if (assertToken(TokenType.CLOSE_BRACKET)) {
                 advanceToken(); // )
             } else {
-                printErr(currentToken, "Expected close bracket but found");
+                printErrCurrentToken("Expected close bracket but found");
             }
         }
-        if (assertToken(currentToken, TokenType.STRING)) {
+        if (assertToken(TokenType.STRING)) {
             // IDENTIFIER
             String variableName = String.valueOf(currentToken.value);
             if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
@@ -372,13 +350,13 @@ public class Eden {
                     setValueFromIdentifier(rawValue, type);
                     advanceToken();
                 } else {
-                    printErr(currentToken, "Variable is not initialized");
+                    printErrCurrentToken("Variable is not initialized");
                 }
             } else {
-                printErr(currentToken, "Undefined variable");
+                printErrCurrentToken("Undefined variable");
             }
         }
-        if (assertToken(currentToken, TokenType.KEYWORD)) {
+        if (assertToken(TokenType.KEYWORD)) {
             // true or false
             String value = String.valueOf(currentToken.value);
             if ("true".equalsIgnoreCase(value)) {
@@ -386,7 +364,7 @@ public class Eden {
             } else if ("false".equalsIgnoreCase(value)) {
                 stack.push(0);
             } else {
-                printErr(currentToken, "Expected boolean but found");
+                printErrCurrentToken("Expected boolean but found");
             }
             advanceToken();
         }
@@ -400,7 +378,7 @@ public class Eden {
                     int value = (int) rawValue;
                     stack.push(value);
                 } else {
-                    printErr(currentToken, "Expected integer value but found");
+                    printErrCurrentToken("Expected integer value but found");
                 }
                 break;
             }
@@ -413,20 +391,20 @@ public class Eden {
                         stack.push(0);
                     }
                 } else {
-                    printErr(currentToken, "Expected integer value but found");
+                    printErrCurrentToken("Expected integer value but found");
                 }
                 break;
             }
             default: {
                 String error = String.format("variableType %s is not implemented", variableType);
-                printErr(currentToken, error);
+                printErrCurrentToken(error);
             }
         }
     }
 
     static void opPlus() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Plus operation needs two integers, but found");
+            printErrCurrentToken("Plus operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -435,13 +413,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a + _b);
         } else {
-            printErr(currentToken, "Expected two integers, but found");
+            printErrCurrentToken("Expected two integers, but found");
         }
     }
 
     static void opMinus() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Minus operation needs two integers, but found");
+            printErrCurrentToken("Minus operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -450,13 +428,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a - _b);
         } else {
-            printErr(currentToken, "Expected two integers, but found");
+            printErrCurrentToken("Expected two integers, but found");
         }
     }
 
     static void opStar() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Multiplication operation needs two integers, but found");
+            printErrCurrentToken("Multiplication operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -465,13 +443,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a * _b);
         } else {
-            printErr(currentToken, "Expected two integers, but found");
+            printErrCurrentToken("Expected two integers, but found");
         }
     }
 
     static void opSlash() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Dividing operation needs two integers, but found");
+            printErrCurrentToken("Dividing operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -480,13 +458,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a / _b);
         } else {
-            printErr(currentToken, "Expected two integers, but found");
+            printErrCurrentToken("Expected two integers, but found");
         }
     }
 
     static void opMore() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Compare operation '>' needs two integers, but found");
+            printErrCurrentToken("Compare operation '>' needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -496,13 +474,13 @@ public class Eden {
             int value = _a > _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(currentToken, "More operation supports only integer for now");
+            printErrCurrentToken("More operation supports only integer for now");
         }
     }
 
     static void opLess() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Compare operation '<' needs two integers, but found");
+            printErrCurrentToken("Compare operation '<' needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -512,13 +490,13 @@ public class Eden {
             int value = _a < _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(currentToken, "Less operation supports only integer for now");
+            printErrCurrentToken("Less operation supports only integer for now");
         }
     }
 
     static void opEqual() {
         if (stack.size() < 2) {
-            printErr(currentToken, "Compare operation '=' needs two integers, but found");
+            printErrCurrentToken("Compare operation '=' needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -528,7 +506,7 @@ public class Eden {
             int value = _a == _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(currentToken, "Equal operation supports only integer for now");
+            printErrCurrentToken("Equal operation supports only integer for now");
         }
     }
 
@@ -536,8 +514,32 @@ public class Eden {
         return Integer.parseInt(String.valueOf(value));
     }
 
-    static boolean assertToken(Token token, TokenType type) {
-        return token.type == type;
+    static boolean assertKeyWord(String value) {
+        if (assertToken(TokenType.KEYWORD) && assertTokenValue(value)) {
+            advanceToken();
+            return true;
+        }
+        return false;
+    }
+
+    static boolean assertToken(TokenType type) {
+        return currentToken.type == type;
+    }
+
+    static boolean assertTokenValue(String value) {
+        return String.valueOf(currentToken.value).equalsIgnoreCase(value);
+    }
+
+    static boolean assertTokenAndAdvance(TokenType type) {
+        if (assertToken(type)) {
+            advanceToken();
+            return true;
+        }
+        return false;
+    }
+
+    static void printErrCurrentToken(String errMessage) {
+        printErr(currentToken, errMessage);
     }
 
     static void printErr(Token token, String errMessage) {
