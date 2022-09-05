@@ -4,3 +4,4 @@
 int a = 1; // The same here
 ~ a; // This will return 1
 // Hello ;>
+// Final output 1

@@ -7,3 +7,4 @@ isX = -1;                   // All is false but 1
 ~ isX;                      // False (0)
 ~ isY;                      // Obviously it is true
 ~ isX = false;              // This also will return 1
+// Final output 1 0 1 1
