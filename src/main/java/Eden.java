@@ -15,6 +15,7 @@ public class Eden {
     static Stack<Object> stack = new Stack<>();
     static List<Scope> scopeList = new ArrayList<>();
     static int scopeLevel = 0;
+    static Token currentToken;
 
     public static void main(String[] args) throws IOException {
         // Args
@@ -52,15 +53,16 @@ public class Eden {
     }
 
     static void program() {
+        // Initialization.
         scopeList.add(new Scope());
-        while (getCurrent().type != TokenType.END) {
+        currentToken = getCurrent();
+        while (currentToken.type != TokenType.END) {
             specialBlockStatements();
         }
     }
 
     static void specialBlockStatements() {
-        Token current = getCurrent();
-        String value = String.valueOf(current.value);
+        String value = String.valueOf(currentToken.value);
         switch (value) {
             case "if": {
                 ifStatement();
@@ -73,27 +75,25 @@ public class Eden {
     }
 
     static void blockStatements(boolean isNewScope) {
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.OPEN_CURLY_BRACKET)) {
+        if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
             advanceToken();
             if (isNewScope) {
                 scopeList.add(new Scope());
                 scopeLevel++;
             }
             // START BLOCK.
-            while (!assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET) && !assertToken(getCurrent(), TokenType.END)) {
+            while (!assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET) && !assertToken(currentToken, TokenType.END)) {
                 specialBlockStatements();
             }
             // CLOSE BLOCK.
-            current = getCurrent();
-            if (assertToken(current, TokenType.CLOSE_CURLY_BRACKET)) {
+            if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
                 advanceToken();
                 if (isNewScope) {
                     scopeList.remove(scopeLevel);
                     scopeLevel--;
                 }
             } else {
-                printErr(current, "Block statement must close with curly bracket '}' but found");
+                printErr(currentToken, "Block statement must close with curly bracket '}' but found");
             }
         } else {
             statements();
@@ -102,30 +102,27 @@ public class Eden {
 
     static void statements() {
         statement();
-        Token current = getCurrent();
-        if (assertToken(current,TokenType.SEMICOLON)) {
+        if (assertToken(currentToken,TokenType.SEMICOLON)) {
             advanceToken();
         } else {
-            printErr(current, "Expected ';' but found");
+            printErr(currentToken, "Expected ';' but found");
         }
     }
 
     static void statement() {
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.PRINT_STATEMENT)) {
+        if (assertToken(currentToken, TokenType.PRINT_STATEMENT)) {
             printStatement();
-        } else if (assertToken(current, TokenType.KEYWORD)) {
+        } else if (assertToken(currentToken, TokenType.KEYWORD)) {
             keywordStatement();
-        } else if (assertToken(current, TokenType.STRING)) {
+        } else if (assertToken(currentToken, TokenType.STRING)) {
             valueAssignment();
         } else {
-            printErr(current, "Unknown statement");
+            printErr(currentToken, "Unknown statement");
         }
     }
 
     static void keywordStatement() {
-        Token current = getCurrent();
-        String tokenValue = String.valueOf(current.value);
+        String tokenValue = String.valueOf(currentToken.value);
         switch (tokenValue) {
             case "int": {
                 defineVariable(EdenType.INT);
@@ -140,115 +137,106 @@ public class Eden {
                 break;
             }
             default: {
-                printErr(current, "Unknown keyword");
+                printErr(currentToken, "Unknown keyword");
             }
         }
     }
 
     static void ifStatement() {
         advanceToken();
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.OPEN_BRACKET)) {
+        if (assertToken(currentToken, TokenType.OPEN_BRACKET)) {
             advanceToken(); // (
             expression();
             int isFirstBlock = Integer.parseInt(String.valueOf(stack.pop()));
-            current = getCurrent();
-            if (assertToken(current, TokenType.CLOSE_BRACKET)) {
+            if (assertToken(currentToken, TokenType.CLOSE_BRACKET)) {
                 advanceToken(); // )
                 if (isFirstBlock == 1) {
                     blockStatements(false);
-                    current = getCurrent();
-                    if (current.type == TokenType.KEYWORD && String.valueOf(current.value).equalsIgnoreCase("else")) {
+                    if (currentToken.type == TokenType.KEYWORD && String.valueOf(currentToken.value).equalsIgnoreCase("else")) {
                         advanceToken();
                         skipBlock();
                     }
                 } else {
                     skipBlock();
-                    current = getCurrent();
-                    if (current.type == TokenType.KEYWORD && String.valueOf(current.value).equalsIgnoreCase("else")) {
+                    if (currentToken.type == TokenType.KEYWORD && String.valueOf(currentToken.value).equalsIgnoreCase("else")) {
                         advanceToken();
                         blockStatements(false);
                     }
                 }
             } else {
-                printErr(current, "Expected close bracket ')' but found");
+                printErr(currentToken, "Expected close bracket ')' but found");
             }
         } else {
-            printErr(current, "Expected open bracket '(' but found");
+            printErr(currentToken, "Expected open bracket '(' but found");
         }
     }
 
     static void skipBlock() {
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.OPEN_CURLY_BRACKET)) {
+        if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
             advanceToken();
             int indexBracket = 1;
-            while (indexBracket != 0 && !assertToken(getCurrent(), TokenType.END)) {
-                if (assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET)) {
+            while (indexBracket != 0 && !assertToken(currentToken, TokenType.END)) {
+                if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
                     indexBracket--;
                 }
-                if (assertToken(getCurrent(), TokenType.OPEN_CURLY_BRACKET)) {
+                if (assertToken(currentToken, TokenType.OPEN_CURLY_BRACKET)) {
                     indexBracket++;
                 }
                 if (indexBracket != 0) {
                     advanceToken();
                 }
             }
-            if (assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET)) {
+            if (assertToken(currentToken, TokenType.CLOSE_CURLY_BRACKET)) {
                 advanceToken();
             } else {
-                printErr(getCurrent(), "Expected close curly bracket '}' but found");
+                printErr(currentToken, "Expected close curly bracket '}' but found");
             }
         } else {
-            printErr(current, "Expected open curly bracket '{' but found");
+            printErr(currentToken, "Expected open curly bracket '{' but found");
         }
     }
 
     static void defineVariable(EdenType defineType) {
         advanceToken();
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.STRING)) {
-            String variableName = String.valueOf(current.value);
+        if (assertToken(currentToken, TokenType.STRING)) {
+            String variableName = String.valueOf(currentToken.value);
             checkVariableNameAndAddToMap(variableName, defineType);
             valueAssignment();
-            if (assertToken(current, TokenType.COMMA)) {
+            if (assertToken(currentToken, TokenType.COMMA)) {
                 defineVariable(defineType);
             }
         } else {
-            printErr(current, "Expected variable name but found");
+            printErr(currentToken, "Expected variable name but found");
         }
     }
 
     static void checkVariableNameAndAddToMap(String variableName, EdenType tokenType) {
-        Token current = getCurrent();
         if (variableName.length() < 1) {
-            printErr(current, "Variable name must contain at least one symbol");
+            printErr(currentToken, "Variable name must contain at least one symbol");
         }
         if (!Character.isLetter(variableName.charAt(0))) {
-            printErr(current, "Variable name must starts with the letter");
+            printErr(currentToken, "Variable name must starts with the letter");
         }
         if (!Character.isLowerCase(variableName.charAt(0))) {
-            printErr(current, "Variable name must starts with the lower case letter");
+            printErr(currentToken, "Variable name must starts with the lower case letter");
         }
         if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             String error = String.format("Variable name %s is already defined", variableName);
-            printErr(current, error);
+            printErr(currentToken, error);
         }
         scopeList.get(scopeLevel).variableMap.put(variableName, tokenType);
     }
 
     static void valueAssignment() {
-        Token current = getCurrent();
-        String variableName = String.valueOf(current.value);
+        String variableName = String.valueOf(currentToken.value);
         if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
             advanceToken();
-            current = getCurrent();
-            if (assertToken(current, TokenType.EQUALS)) {
+            if (assertToken(currentToken, TokenType.EQUALS)) {
                 EdenType variableType = scopeList.get(scopeLevel).variableMap.get(variableName);
                 initializeVariable(variableName, variableType);
             }
         } else {
-            printErr(current, "Variable is not defined");
+            printErr(currentToken, "Variable is not defined");
         }
     }
 
@@ -264,12 +252,11 @@ public class Eden {
 
     static void printStatement() {
         // ~ expr ;
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.PRINT_STATEMENT)) {
+        if (assertToken(currentToken, TokenType.PRINT_STATEMENT)) {
             advanceToken();
             expression();
         } else {
-            printErr(current, "Print statement should starts with '~'");
+            printErr(currentToken, "Print statement should starts with '~'");
         }
         // print
         System.out.println(stack.pop());
@@ -287,14 +274,13 @@ public class Eden {
     }
 
     static void sum() {
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.PLUS)) {
+        if (assertToken(currentToken, TokenType.PLUS)) {
             advanceToken();
             part();
             opPlus();
             sum();
         }
-        if (assertToken(current, TokenType.MINUS)) {
+        if (assertToken(currentToken, TokenType.MINUS)) {
             advanceToken();
             part();
             opMinus();
@@ -303,20 +289,19 @@ public class Eden {
     }
 
     static void logical() {
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.GREATER)) {
+        if (assertToken(currentToken, TokenType.GREATER)) {
             advanceToken();
             part();
             sum();
             opMore();
         }
-        if (assertToken(current, TokenType.LESS)) {
+        if (assertToken(currentToken, TokenType.LESS)) {
             advanceToken();
             part();
             sum();
             opLess();
         }
-        if (assertToken(current, TokenType.EQUALS)) {
+        if (assertToken(currentToken, TokenType.EQUALS)) {
             advanceToken();
             part();
             sum();
@@ -326,9 +311,8 @@ public class Eden {
 
     static void unary() {
         boolean isPositive = true;
-        Token current = getCurrent();
-        if (assertToken(current, TokenType.PLUS) || assertToken(current, TokenType.MINUS)) {
-            if (String.valueOf(current.value).equalsIgnoreCase("-")) {
+        if (assertToken(currentToken, TokenType.PLUS) || assertToken(currentToken, TokenType.MINUS)) {
+            if (String.valueOf(currentToken.value).equalsIgnoreCase("-")) {
                 isPositive = false;
             }
             advanceToken();
@@ -338,14 +322,13 @@ public class Eden {
     }
 
     static void starSlash() {
-        Token current = getCurrent();
-        if (String.valueOf(current.value).equalsIgnoreCase("*")) {
+        if (String.valueOf(currentToken.value).equalsIgnoreCase("*")) {
             advanceToken();
             unary();
             opStar();
             starSlash();
         }
-        if (String.valueOf(current.value).equalsIgnoreCase("/")) {
+        if (String.valueOf(currentToken.value).equalsIgnoreCase("/")) {
             advanceToken();
             unary();
             opSlash();
@@ -360,30 +343,28 @@ public class Eden {
     }
 
     static void arg(boolean isPositive) {
-        Token current = getCurrent();
-        if (current.type == TokenType.NUMBER) {
-            if (assertToken(current, TokenType.NUMBER)) {
-                int tmp = getInt(current.value);
+        if (currentToken.type == TokenType.NUMBER) {
+            if (assertToken(currentToken, TokenType.NUMBER)) {
+                int tmp = getInt(currentToken.value);
                 int value = isPositive ? tmp : -tmp;
                 stack.push(value);
                 advanceToken();
             } else {
-                printErr(current, "Expected integer, but found");
+                printErr(currentToken, "Expected integer, but found");
             }
         }
-        if (assertToken(current, TokenType.OPEN_BRACKET)) {
+        if (assertToken(currentToken, TokenType.OPEN_BRACKET)) {
             advanceToken(); // (
             expression();
-            current = getCurrent();
-            if (assertToken(current, TokenType.CLOSE_BRACKET)) {
+            if (assertToken(currentToken, TokenType.CLOSE_BRACKET)) {
                 advanceToken(); // )
             } else {
-                printErr(current, "Expected close bracket but found");
+                printErr(currentToken, "Expected close bracket but found");
             }
         }
-        if (assertToken(current, TokenType.STRING)) {
+        if (assertToken(currentToken, TokenType.STRING)) {
             // IDENTIFIER
-            String variableName = String.valueOf(current.value);
+            String variableName = String.valueOf(currentToken.value);
             if (scopeList.get(scopeLevel).variableMap.containsKey(variableName)) {
                 if (scopeList.get(scopeLevel).variableValue.containsKey(variableName)) {
                     EdenType type = scopeList.get(scopeLevel).variableMap.get(variableName);
@@ -391,21 +372,21 @@ public class Eden {
                     setValueFromIdentifier(rawValue, type);
                     advanceToken();
                 } else {
-                    printErr(current, "Variable is not initialized");
+                    printErr(currentToken, "Variable is not initialized");
                 }
             } else {
-                printErr(current, "Undefined variable");
+                printErr(currentToken, "Undefined variable");
             }
         }
-        if (assertToken(current, TokenType.KEYWORD)) {
+        if (assertToken(currentToken, TokenType.KEYWORD)) {
             // true or false
-            String value = String.valueOf(current.value);
+            String value = String.valueOf(currentToken.value);
             if ("true".equalsIgnoreCase(value)) {
                 stack.push(1);
             } else if ("false".equalsIgnoreCase(value)) {
                 stack.push(0);
             } else {
-                printErr(current, "Expected boolean but found");
+                printErr(currentToken, "Expected boolean but found");
             }
             advanceToken();
         }
@@ -568,6 +549,7 @@ public class Eden {
     static void advanceToken() {
         if (tokenIndex < tokenList.size()) {
             tokenIndex++;
+            currentToken = getCurrent();
         } else {
             printErr(tokenList.get(tokenList.size()-1), "Can't advance the next token.");
         }
