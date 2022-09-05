@@ -245,7 +245,7 @@ public class Eden {
         expression();
         Object value = stack.pop();
         scopeList.get(scopeLevel).variableValue.put(variableName, value);
-        if (assertToken(getCurrent(), TokenType.COMMA)) {
+        if (assertToken(currentToken, TokenType.COMMA)) {
             defineVariable(variableType);
         }
     }
@@ -400,7 +400,7 @@ public class Eden {
                     int value = (int) rawValue;
                     stack.push(value);
                 } else {
-                    printErr(getCurrent(), "Expected integer value but found");
+                    printErr(currentToken, "Expected integer value but found");
                 }
                 break;
             }
@@ -413,20 +413,20 @@ public class Eden {
                         stack.push(0);
                     }
                 } else {
-                    printErr(getCurrent(), "Expected integer value but found");
+                    printErr(currentToken, "Expected integer value but found");
                 }
                 break;
             }
             default: {
                 String error = String.format("variableType %s is not implemented", variableType);
-                printErr(getCurrent(), error);
+                printErr(currentToken, error);
             }
         }
     }
 
     static void opPlus() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Plus operation needs two integers, but found");
+            printErr(currentToken, "Plus operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -435,13 +435,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a + _b);
         } else {
-            printErr(getCurrent(), "Expected two integers, but found");
+            printErr(currentToken, "Expected two integers, but found");
         }
     }
 
     static void opMinus() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Minus operation needs two integers, but found");
+            printErr(currentToken, "Minus operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -450,13 +450,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a - _b);
         } else {
-            printErr(getCurrent(), "Expected two integers, but found");
+            printErr(currentToken, "Expected two integers, but found");
         }
     }
 
     static void opStar() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Multiplication operation needs two integers, but found");
+            printErr(currentToken, "Multiplication operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -465,13 +465,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a * _b);
         } else {
-            printErr(getCurrent(), "Expected two integers, but found");
+            printErr(currentToken, "Expected two integers, but found");
         }
     }
 
     static void opSlash() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Dividing operation needs two integers, but found");
+            printErr(currentToken, "Dividing operation needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -480,13 +480,13 @@ public class Eden {
             int _b = getInt(b);
             stack.push(_a / _b);
         } else {
-            printErr(getCurrent(), "Expected two integers, but found");
+            printErr(currentToken, "Expected two integers, but found");
         }
     }
 
     static void opMore() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Compare operation '>' needs two integers, but found");
+            printErr(currentToken, "Compare operation '>' needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -496,7 +496,7 @@ public class Eden {
             int value = _a > _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(getCurrent(), "More operation supports only integer for now");
+            printErr(currentToken, "More operation supports only integer for now");
         }
     }
 
@@ -512,13 +512,13 @@ public class Eden {
             int value = _a < _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(getCurrent(), "Less operation supports only integer for now");
+            printErr(currentToken, "Less operation supports only integer for now");
         }
     }
 
     static void opEqual() {
         if (stack.size() < 2) {
-            printErr(getCurrent(), "Compare operation '=' needs two integers, but found");
+            printErr(currentToken, "Compare operation '=' needs two integers, but found");
         }
         Object b = stack.pop();
         Object a = stack.pop();
@@ -528,7 +528,7 @@ public class Eden {
             int value = _a == _b ? 1 : 0;
             stack.push(value);
         } else {
-            printErr(getCurrent(), "Equal operation supports only integer for now");
+            printErr(currentToken, "Equal operation supports only integer for now");
         }
     }
 
