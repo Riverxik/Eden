@@ -54,26 +54,44 @@ public class Eden {
     static void program() {
         scopeList.add(new Scope());
         while (getCurrent().type != TokenType.END) {
-            blockStatements();
+            specialBlockStatements();
         }
     }
 
-    static void blockStatements() {
+    static void specialBlockStatements() {
+        Token current = getCurrent();
+        String value = String.valueOf(current.value);
+        switch (value) {
+            case "if": {
+                ifStatement();
+                break;
+            }
+            default: {
+                blockStatements(true);
+            }
+        }
+    }
+
+    static void blockStatements(boolean isNewScope) {
         Token current = getCurrent();
         if (assertToken(current, TokenType.OPEN_CURLY_BRACKET)) {
             advanceToken();
-            scopeList.add(new Scope());
-            scopeLevel++;
+            if (isNewScope) {
+                scopeList.add(new Scope());
+                scopeLevel++;
+            }
             // START BLOCK.
             while (!assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET) && !assertToken(getCurrent(), TokenType.END)) {
-                blockStatements();
+                specialBlockStatements();
             }
             // CLOSE BLOCK.
             current = getCurrent();
             if (assertToken(current, TokenType.CLOSE_CURLY_BRACKET)) {
                 advanceToken();
-                scopeList.remove(scopeLevel);
-                scopeLevel--;
+                if (isNewScope) {
+                    scopeList.remove(scopeLevel);
+                    scopeLevel--;
+                }
             } else {
                 printErr(current, "Block statement must close with curly bracket '}' but found");
             }
@@ -124,6 +142,65 @@ public class Eden {
             default: {
                 printErr(current, "Unknown keyword");
             }
+        }
+    }
+
+    static void ifStatement() {
+        advanceToken();
+        Token current = getCurrent();
+        if (assertToken(current, TokenType.OPEN_BRACKET)) {
+            advanceToken(); // (
+            expression();
+            int isFirstBlock = Integer.parseInt(String.valueOf(stack.pop()));
+            current = getCurrent();
+            if (assertToken(current, TokenType.CLOSE_BRACKET)) {
+                advanceToken(); // )
+                if (isFirstBlock == 1) {
+                    blockStatements(false);
+                    current = getCurrent();
+                    if (current.type == TokenType.KEYWORD && String.valueOf(current.value).equalsIgnoreCase("else")) {
+                        advanceToken();
+                        skipBlock();
+                    }
+                } else {
+                    skipBlock();
+                    current = getCurrent();
+                    if (current.type == TokenType.KEYWORD && String.valueOf(current.value).equalsIgnoreCase("else")) {
+                        advanceToken();
+                        blockStatements(false);
+                    }
+                }
+            } else {
+                printErr(current, "Expected close bracket ')' but found");
+            }
+        } else {
+            printErr(current, "Expected open bracket '(' but found");
+        }
+    }
+
+    static void skipBlock() {
+        Token current = getCurrent();
+        if (assertToken(current, TokenType.OPEN_CURLY_BRACKET)) {
+            advanceToken();
+            int indexBracket = 1;
+            while (indexBracket != 0 && !assertToken(getCurrent(), TokenType.END)) {
+                if (assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET)) {
+                    indexBracket--;
+                }
+                if (assertToken(getCurrent(), TokenType.OPEN_CURLY_BRACKET)) {
+                    indexBracket++;
+                }
+                if (indexBracket != 0) {
+                    advanceToken();
+                }
+            }
+            if (assertToken(getCurrent(), TokenType.CLOSE_CURLY_BRACKET)) {
+                advanceToken();
+            } else {
+                printErr(getCurrent(), "Expected close curly bracket '}' but found");
+            }
+        } else {
+            printErr(current, "Expected open curly bracket '{' but found");
         }
     }
 
