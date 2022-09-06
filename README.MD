@@ -17,7 +17,7 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] Support executing external programs
 - [ ] Class declarations
 - [ ] Method declarations
-- [ ] Variable declarations
+- [x] Variable declarations
 - [ ] Constructors
 - [x] Type: Integer
 - [x] Type: Boolean
@@ -25,8 +25,9 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] Type: String
 - [ ] List structure
 - [ ] Stack structure
-- [ ] Conditional statements (if-else)
+- [x] Conditional statements (if-else)
 - [ ] Loop statement (probably while)
+---
 
 ## Statements
 
@@ -45,6 +46,38 @@ Examples:
 ~ 1 + 2;
 ~ -1;
 ```
+---
+
+#### If-else statements
+Conditional statements are used to perform different actions based on different conditions.
+
+Syntax:
+```
+if (expr) { 
+    // statements when expression returns 1; 
+} else {
+    // statements when expression returns 0;
+}
+```
+
+Examples:
+```
+// Prints 456
+bool a = false;
+if (a) {
+    ~ 123;
+} else {
+    ~ 456;
+}
+
+// Not equal to (like != in java)
+int a = expr;
+if (expr = 0) {
+    // statements
+    ...
+}
+```
+---
 
 #### Variable definition and assignment
 
@@ -65,6 +98,7 @@ int a = 1, b = 2, c = a + b; // c = 3
 bool isX = true;
 bool isY = 2 = 2; // isY = true
 ```
+---
 
 ## Supported Operations
 
