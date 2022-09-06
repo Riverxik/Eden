@@ -1,0 +1,17 @@
+int a = 0;
+~ a; // prints 0
+if (a) {
+    ~ 123;
+} else {
+    a = 1;
+    if (a = 0) {
+        int a = 3; // This error will not be detected at least until code flow came here
+        // It is definitely good reason to improve error checking
+        ~ a;
+        ~ 456;
+    } else {
+        ~ 789;
+    }
+}
+~ a; // prints 1
+// Final output 0 789 1
