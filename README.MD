@@ -26,7 +26,7 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] List structure
 - [ ] Stack structure
 - [x] Conditional statements (if-else)
-- [ ] Loop statement (probably while)
+- [x] Loop statement (probably while)
 ---
 
 ## Statements

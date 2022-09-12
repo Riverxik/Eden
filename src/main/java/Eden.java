@@ -64,8 +64,38 @@ public class Eden {
     static void specialBlockStatements() {
         if (assertKeyWord("if")) {
             ifStatement();
+        } else if (assertKeyWord("while")) {
+            whileStatement();
         } else {
-            blockStatements(true);
+            blockStatements(false);
+        }
+    }
+
+    static void whileStatement() {
+        if (assertTokenAndAdvance(TokenType.OPEN_BRACKET)) {
+            int startExpressionIndex = tokenIndex;
+            int endWhileExpressionIndex = -1;
+            expression();
+            int value = Integer.parseInt(String.valueOf(stack.pop()));
+            if (assertTokenAndAdvance(TokenType.CLOSE_BRACKET)) {
+                while (value == 1) {
+                    blockStatements(false);
+                    endWhileExpressionIndex = tokenIndex;
+                    tokenIndex = startExpressionIndex;
+                    currentToken = getCurrent();
+                    expression();
+                    value = Integer.parseInt(String.valueOf(stack.pop()));
+                    advanceToken(); // skip )
+                }
+                if (endWhileExpressionIndex != -1) {
+                    tokenIndex = endWhileExpressionIndex;
+                    currentToken = getCurrent();
+                }
+            } else {
+                printErrCurrentToken("Expected close bracket ')' but found");
+            }
+        } else {
+            printErrCurrentToken("Expected open bracket '(' but found");
         }
     }
 
