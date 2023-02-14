@@ -60,7 +60,7 @@ public class Eden {
     }
 
     enum TokenType {
-        CHAR,
+        //CHARACTER,
         SEMICOLON,
         COMMA,
         OPEN_BRACKET,
@@ -76,7 +76,7 @@ public class Eden {
         LESS,
         EQUALS,
         NUMBER,
-        STRING,
+        SYMBOL,
         KEYWORD,
         END
     }
@@ -181,10 +181,10 @@ public class Eden {
                 }
                 if (!Character.isLetter(currentChar)) {
                     // Characters.
-                    tokenizeCharacter();
+                    tokenizeSpecialCharacters();
                 } else {
-                    // Strings.
-                    tokenizeString();
+                    // Symbols.
+                    tokenizeSymbol();
                 }
             }
             tokenList.add(new Token(TokenType.END, "End of File", new Location(line, column)));
@@ -200,10 +200,10 @@ public class Eden {
             tokenList.add(new Token(TokenType.NUMBER, sb.toString(), new Location(line, column)));
         }
 
-        void tokenizeString() {
+        void tokenizeSymbol() {
             StringBuilder sb = new StringBuilder();
             currentChar = peek();
-            while (!isEndOfFile && Character.isLetter(currentChar)) {
+            while (!isEndOfFile && (Character.isLetter(currentChar) || Character.isDigit(currentChar))) {
                 sb.append(currentChar);
                 next();
             }
@@ -211,13 +211,13 @@ public class Eden {
             if (keywordList.contains(tokenValue)) {
                 tokenList.add(new Token(TokenType.KEYWORD, tokenValue, new Location(line, column)));
             } else {
-                tokenList.add(new Token(TokenType.STRING, tokenValue, new Location(line, column)));
+                tokenList.add(new Token(TokenType.SYMBOL, tokenValue, new Location(line, column)));
             }
         }
 
-        void tokenizeCharacter() {
+        void tokenizeSpecialCharacters() {
             if (allowedCharacters.indexOf(currentChar) == -1) {
-                printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Lexer: Character is not allowed");
+                printErr(new Token(TokenType.SYMBOL, currentChar, new Location(line, column)), "Lexer: Symbol is not allowed");
             }
             switch (currentChar) {
                 case ';': {
@@ -277,11 +277,7 @@ public class Eden {
                     break;
                 }
                 default: {
-                    if (Character.isLetter(currentChar)) {
-                        tokenList.add(new Token(TokenType.CHAR, currentChar, new Location(line, column)));
-                    } else {
-                        printErr(new Token(TokenType.CHAR, currentChar, new Location(line, column)), "Lexer: Unknown character");
-                    }
+                    printErr(new Token(TokenType.SYMBOL, currentChar, new Location(line, column)), "Lexer: Unknown character");
                 }
             }
             next();
