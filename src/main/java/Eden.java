@@ -53,12 +53,6 @@ public class Eden {
         System.exit(1);
     }
 
-    enum EdenType {
-        INT,
-        CHAR,
-        BOOL
-    }
-
     enum TokenType {
         //CHARACTER,
         SEMICOLON,
