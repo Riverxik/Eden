@@ -76,6 +76,9 @@ public class Eden {
             case DO_OP_MULTIPLY: doOpMultiply(); break;
             case DO_OP_DIVIDE: doOpDivide(); break;
             case DO_OP_UNAR_MINUS: doOpUnarMinus(); break;
+            case DO_OP_EQUALS: doOpEquals(); break;
+            case DO_OP_GREATER: doOpGreater(); break;
+            case DO_OP_LESS: doOpLess(); break;
             case DO_SKIP: doStateSkip(currentToken); break;
             default: {
                 System.err.printf("ERROR: Unknown State: %s with Token: %s", state, currentToken);
@@ -299,6 +302,42 @@ public class Eden {
             }
             Object first = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) * -1;
+            programStack.push(result);
+        }
+    }
+
+    static void doOpEquals() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Equals operation expected two operands, but found less");
+            }
+            Object second = programStack.pop();
+            Object first = programStack.pop();
+            boolean result = Integer.parseInt(String.valueOf(first)) == Integer.parseInt(String.valueOf(second));
+            programStack.push(result);
+        }
+    }
+
+    static void doOpGreater() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Greater operation expected two operands, but found less");
+            }
+            Object second = programStack.pop();
+            Object first = programStack.pop();
+            boolean result = Integer.parseInt(String.valueOf(first)) > Integer.parseInt(String.valueOf(second));
+            programStack.push(result);
+        }
+    }
+
+    static void doOpLess() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Greater operation expected two operands, but found less");
+            }
+            Object second = programStack.pop();
+            Object first = programStack.pop();
+            boolean result = Integer.parseInt(String.valueOf(first)) < Integer.parseInt(String.valueOf(second));
             programStack.push(result);
         }
     }
