@@ -1,3 +1,7 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -13,6 +17,8 @@ public class Eden {
     static List<Token> tokenList = new ArrayList<>();
     static Stack<EdenState> stackState = new Stack<>();
     static Stack<Object> programStack = new Stack<>();
+    static List<String> stringConstants = new ArrayList<>();
+    static StringBuilder programCode = new StringBuilder();
     static int index = 0;
     static boolean isInterpreter = true;
 
@@ -33,6 +39,9 @@ public class Eden {
                     System.exit(1);
                 }
             }
+            if (args[i].equalsIgnoreCase("-c")) {
+                isInterpreter = false;
+            }
             i++;
         }
 
@@ -48,12 +57,111 @@ public class Eden {
         lexer.tokenize();
         lexer.clearComments();
 
+        // Parsing.
         stackState.push(EdenState.PROGRAM);
         Token currentToken = tokenList.get(index);
         while (currentToken.type != TokenType.END || stackState.peek() != EdenState.PROGRAM) {
             choseRule(currentToken);
             currentToken = tokenList.get(index);
         }
+        if (!isInterpreter) {
+            // Compilation
+            writeFile(sourceName);
+            compile(sourceName);
+        }
+    }
+
+    static void compile(String sourceName) {
+        try {
+            String name = sourceName.split("[.]")[0];
+            String cmdNasm = String.format("cmd.exe /c nasm -f win32 %s.asm", name);
+            String cmdGoLink = String.format("cmd.exe /c golink /entry:Start /console kernel32.dll user32.dll %s.obj", name);
+            System.out.println(cmdNasm);
+            Process process = Runtime.getRuntime().exec(cmdNasm);
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                printErr("Error while compiling with nasm");
+            }
+            System.out.println(cmdGoLink);
+            process = Runtime.getRuntime().exec(cmdGoLink);
+            exitCode = process.waitFor();
+            if (exitCode != 0) {
+                printErr("Error while linking with golink");
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void writeFile(String sourceName) {
+        try {
+            File output = new File(sourceName.split("[.]")[0]+".asm");
+            FileWriter fw = new FileWriter(output);
+            writeHeader(fw);
+            writeData(fw);
+            writeVariables(fw);
+            writeText(fw);
+            fw.write(programCode.toString());
+            fw.write("\tcall exit\n");
+            fw.flush();
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void writeHeader(FileWriter fw) throws IOException {
+        fw.write("extern _GetStdHandle@4\n" +
+                     "extern _WriteFile@20\n" +
+                     "extern _ExitProcess@4\n" +
+                     "\n" +
+                     "global Start\n");
+    }
+
+    static void writeData(FileWriter fw) throws IOException {
+        int index = 0;
+        fw.write("section .data\n");
+        for (String stringConstant : stringConstants) {
+            String fullName = "str_" + index++;
+            fw.write("\t" + fullName + " db `" + stringConstant + "`\n");
+            fw.write("\t" + fullName + "Len EQU $-" + fullName + "\n");
+        }
+    }
+
+    static void writeVariables(FileWriter fw) throws IOException {
+        fw.write("section .bss\n");
+        fw.write("\tStdHandle resd 1\n");
+    }
+
+    static void writeText(FileWriter fw) throws IOException {
+        // printStr
+        fw.write("section .text\n");
+        fw.write(";input\n");
+        fw.write(";eax - message\n");
+        fw.write(";ebx - msglength\n");
+        fw.write("printStr:\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tpush ebx\n");
+        fw.write("\tpush 0\n");
+        fw.write("\tpush 0\n");
+        fw.write("\tpush ebx\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tpush dword [StdHandle]\n");
+        fw.write("\tcall _WriteFile@20\n");
+        fw.write("\tpop ebx\n");
+        fw.write("\tpop eax\n");
+        fw.write("\tret\n");
+        // Exit
+        fw.write("exit:\n");
+        fw.write("\t;End of the program\n");
+        fw.write("\tpush 0\n");
+        fw.write("\tcall _ExitProcess@4\n");
+        // Start
+        fw.write("Start:\n");
+        fw.write("\t;Get the console handler\n");
+        fw.write("\tpush -11\n");
+        fw.write("\tcall _GetStdHandle@4\n");
+        fw.write("\tmov dword [StdHandle], eax\n");
     }
 
     static void choseRule(Token currentToken) {
@@ -235,6 +343,14 @@ public class Eden {
                  index++;
                  programStack.push(currentToken.value);
              }
+        } else {
+            if (currentToken.type == TokenType.STRING) {
+                index++;
+                stringConstants.add(String.valueOf(currentToken.value));
+                programStack.push("str_" + (stringConstants.size() - 1));
+            } else {
+                throw new NotImplementedException();
+            }
         }
     }
 
@@ -245,6 +361,12 @@ public class Eden {
             }
             Object value = programStack.pop();
             System.out.println(value);
+        } else {
+            int valueIndex = Integer.parseInt(String.valueOf(programStack.pop()).split("_")[1]);
+            programCode.append("\t;OpPrint\n");
+            programCode.append("\tmov eax, ").append("str_").append(valueIndex).append("\n");
+            programCode.append("\tmov ebx, ").append("str_").append(valueIndex).append("Len\n");
+            programCode.append("\tcall printStr\n");
         }
     }
 
@@ -257,6 +379,8 @@ public class Eden {
             Object second = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) + Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -269,6 +393,8 @@ public class Eden {
             Object first = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) - Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -281,6 +407,8 @@ public class Eden {
             Object second = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) * Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -293,6 +421,8 @@ public class Eden {
             Object first = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) / Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -304,6 +434,8 @@ public class Eden {
             Object first = programStack.pop();
             int result = Integer.parseInt(String.valueOf(first)) * -1;
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -316,6 +448,8 @@ public class Eden {
             Object first = programStack.pop();
             boolean result = Integer.parseInt(String.valueOf(first)) == Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -328,6 +462,8 @@ public class Eden {
             Object first = programStack.pop();
             boolean result = Integer.parseInt(String.valueOf(first)) > Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -340,6 +476,8 @@ public class Eden {
             Object first = programStack.pop();
             boolean result = Integer.parseInt(String.valueOf(first)) < Integer.parseInt(String.valueOf(second));
             programStack.push(result);
+        } else {
+            throw new NotImplementedException();
         }
     }
 
