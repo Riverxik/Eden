@@ -395,6 +395,7 @@ public class Eden {
         LESS,
         EQUALS,
         NUMBER,
+        STRING,
         SYMBOL,
         KEYWORD,
         END
@@ -500,7 +501,11 @@ public class Eden {
                 }
                 if (!Character.isLetter(currentChar)) {
                     // Characters.
-                    tokenizeSpecialCharacters();
+                    if (currentChar == '\"') {
+                        tokenizeString();
+                    } else {
+                        tokenizeSpecialCharacters();
+                    }
                 } else {
                     // Symbols.
                     tokenizeSymbol();
@@ -532,6 +537,19 @@ public class Eden {
             } else {
                 tokenList.add(new Token(TokenType.SYMBOL, tokenValue, new Location(line, column)));
             }
+        }
+
+        void tokenizeString() {
+            StringBuilder sb = new StringBuilder();
+            next();
+            currentChar = peek();
+            while (!isEndOfFile && currentChar != '\"') {
+                sb.append(currentChar);
+                next();
+            }
+            next();
+            String tokenValue = sb.toString();
+            tokenList.add(new Token(TokenType.STRING, tokenValue, new Location(line, column)));
         }
 
         void tokenizeSpecialCharacters() {
