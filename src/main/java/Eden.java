@@ -125,8 +125,8 @@ public class Eden {
 
     static void doStateExpression(Token currentToken) {
         TokenType cType = currentToken.type;
-        if (cType == TokenType.PLUS || cType == TokenType.MINUS
-                || cType == TokenType.OPEN_BRACKET || cType == TokenType.NUMBER) {
+        if (cType == TokenType.PLUS || cType == TokenType.MINUS || cType == TokenType.OPEN_BRACKET
+                || cType == TokenType.NUMBER || cType == TokenType.STRING) {
             stackState.push(EdenState.LOGICAL);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
@@ -209,14 +209,15 @@ public class Eden {
             stackState.push(EdenState.ARG);
             return;
         }
-        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.OPEN_BRACKET) {
+        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING
+                || currentToken.type == TokenType.OPEN_BRACKET) {
             stackState.push(EdenState.STARSLASH);
             stackState.push(EdenState.ARG);
         }
     }
 
     static void doStateArg(Token currentToken) {
-        if (currentToken.type == TokenType.NUMBER) {
+        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
             stackState.push(EdenState.DO_SKIP);
             return;
         }
@@ -230,7 +231,7 @@ public class Eden {
 
     static void doStateSkip(Token currentToken) {
         if (isInterpreter) {
-             if (currentToken.type == TokenType.NUMBER) {
+             if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
                  index++;
                  programStack.push(currentToken.value);
              }
