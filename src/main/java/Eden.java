@@ -121,34 +121,100 @@ public class Eden {
     static void writeData(FileWriter fw) throws IOException {
         int index = 0;
         fw.write("section .data\n");
+        fw.write("\tstr_NL db `\\r\\n`\n");
         for (String stringConstant : stringConstants) {
             String fullName = "str_" + index++;
-            fw.write("\t" + fullName + " db `" + stringConstant + "`\n");
-            fw.write("\t" + fullName + "Len EQU $-" + fullName + "\n");
+            fw.write("\t" + fullName + " db `" + stringConstant + "`,0\n");
+            //fw.write("\t" + fullName + "Len EQU $-" + fullName + "\n");
         }
     }
 
     static void writeVariables(FileWriter fw) throws IOException {
         fw.write("section .bss\n");
         fw.write("\tStdHandle resd 1\n");
+        fw.write("\tdigitBuffer resb 100\n");
+        fw.write("\tdigitBufferPos resb 8\n");
     }
 
     static void writeText(FileWriter fw) throws IOException {
-        // printStr
         fw.write("section .text\n");
-        fw.write(";input\n");
+        // print
+        fw.write(";In:\n");
+        fw.write(";eax - msgToPrint\n");
+        fw.write(";ebx - 0 if it's number otherwise string\n");
+        fw.write("print:\n");
+        fw.write("\tcmp eax, 4000000 ;IDK WTF IS THIS, SORRY\n");
+        fw.write("\tjge _str\n");
+        fw.write("\tcall printInt\n");
+        fw.write("\t_str:\n");
+        fw.write("\tcall printStr\n");
+        fw.write("\tret\n");
+        // printStr
+        fw.write(";In:\n");
         fw.write(";eax - message\n");
-        fw.write(";ebx - msglength\n");
         fw.write("printStr:\n");
         fw.write("\tpush eax\n");
-        fw.write("\tpush ebx\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tmov ebx, 0\n");
+        fw.write("_printCountLoop:\n");
+        fw.write("\tinc eax\n");
+        fw.write("\tinc ebx\n");
+        fw.write("\tmov cl, [eax]\n");
+        fw.write("\tcmp cl, 0\n");
+        fw.write("\tjne _printCountLoop\n");
+        fw.write("\tpop eax\n");
         fw.write("\tpush 0\n");
         fw.write("\tpush 0\n");
         fw.write("\tpush ebx\n");
         fw.write("\tpush eax\n");
         fw.write("\tpush dword [StdHandle]\n");
         fw.write("\tcall _WriteFile@20\n");
+        fw.write("\tpop eax\n");
+        fw.write("\tret\n");
+        // printInt
+        fw.write(";In:\n");
+        fw.write(";eax - number\n");
+        fw.write(";ebx - lengthOfNumber\n");
+        fw.write("printInt:\n");
+        fw.write("\tcall numCountLen\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tpush ebx\n");
+        fw.write("\tmov ecx, digitBuffer\n");
+        fw.write("\tdec ebx\n");
+        fw.write("\tadd ecx, ebx\n");
+        fw.write("\tmov [ecx+1], byte 0\n");
+        fw.write("\tmov [digitBufferPos], ecx\n");
+        fw.write("_intToStrLoop:\n");
+        fw.write("\tmov edx, 0\n");
+        fw.write("\tmov ebx, 10\n");
+        fw.write("\tdiv ebx\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tadd edx, 48 ; Convert last character to digit\n");
+        fw.write("\tmov ecx, [digitBufferPos]\n");
+        fw.write("\tmov [ecx], dl\n");
+        fw.write("\tdec ecx\n");
+        fw.write("\tmov [digitBufferPos], ecx\n");
+        fw.write("\tpop eax\n");
+        fw.write("\tcmp eax, 0\n");
+        fw.write("\tjne _intToStrLoop\n");
+        fw.write("\tmov [digitBufferPos], eax\n");
         fw.write("\tpop ebx\n");
+        fw.write("\tpop eax\n");
+        fw.write("\tmov eax, digitBuffer\n");
+        //fw.write("\tcall printStr\n");
+        fw.write("\tret\n");
+        // numCountLen
+        fw.write("numCountLen:\n");
+        fw.write("\tpush eax\n");
+        fw.write("\tmov ecx, 0\n");
+        fw.write("\t_numCountLoop:\n");
+        fw.write("\tmov edx, 0\n");
+        fw.write("\tmov ebx, 10\n");
+        fw.write("\tdiv ebx\n");
+        fw.write("\tinc ecx\n");
+        fw.write("\tcmp eax, 0\n");
+        fw.write("\tjne _numCountLoop\n");
+        fw.write("\tmov ebx, ecx\n");
         fw.write("\tpop eax\n");
         fw.write("\tret\n");
         // Exit
@@ -344,12 +410,16 @@ public class Eden {
                  programStack.push(currentToken.value);
              }
         } else {
+            index++;
             if (currentToken.type == TokenType.STRING) {
-                index++;
-                stringConstants.add(String.valueOf(currentToken.value));
-                programStack.push("str_" + (stringConstants.size() - 1));
+                String stringValue = String.valueOf(currentToken.value);
+                stringConstants.add(stringValue);
+                String address = "str_" + (stringConstants.size() - 1);
+                programCode.append("\t;OpPushString\n");
+                programCode.append("\tpush ").append(address).append("\n");
             } else {
-                throw new NotImplementedException();
+                programCode.append("\t;OpPushNum\n");
+                programCode.append("\tpush ").append(currentToken.value).append("\n");
             }
         }
     }
@@ -362,11 +432,9 @@ public class Eden {
             Object value = programStack.pop();
             System.out.println(value);
         } else {
-            int valueIndex = Integer.parseInt(String.valueOf(programStack.pop()).split("_")[1]);
             programCode.append("\t;OpPrint\n");
-            programCode.append("\tmov eax, ").append("str_").append(valueIndex).append("\n");
-            programCode.append("\tmov ebx, ").append("str_").append(valueIndex).append("Len\n");
-            programCode.append("\tcall printStr\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tcall print\n");
         }
     }
 
@@ -380,7 +448,11 @@ public class Eden {
             int result = Integer.parseInt(String.valueOf(first)) + Integer.parseInt(String.valueOf(second));
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpPlus\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tadd eax, ebx\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
