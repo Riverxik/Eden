@@ -466,7 +466,11 @@ public class Eden {
             int result = Integer.parseInt(String.valueOf(first)) - Integer.parseInt(String.valueOf(second));
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpMinus\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tsub eax, ebx\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
@@ -480,7 +484,11 @@ public class Eden {
             int result = Integer.parseInt(String.valueOf(first)) * Integer.parseInt(String.valueOf(second));
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpMultiply\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tmul ebx\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
@@ -494,7 +502,12 @@ public class Eden {
             int result = Integer.parseInt(String.valueOf(first)) / Integer.parseInt(String.valueOf(second));
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpDivide\n");
+            programCode.append("\tpop ecx\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\txor edx, edx\n");
+            programCode.append("\tdiv ecx\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
@@ -507,7 +520,10 @@ public class Eden {
             int result = Integer.parseInt(String.valueOf(first)) * -1;
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpUnarMinus\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tneg eax\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
