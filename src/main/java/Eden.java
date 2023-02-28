@@ -530,12 +530,19 @@ public class Eden {
             if (programStack.size() < 2) {
                 printErr("Equals operation expected two operands, but found less");
             }
-            Object second = programStack.pop();
-            Object first = programStack.pop();
-            boolean result = Integer.parseInt(String.valueOf(first)) == Integer.parseInt(String.valueOf(second));
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first == second ? 1 : 0;
             programStack.push(result);
         } else {
-            throw new NotImplementedException();
+            programCode.append("\t;OpEquals\n");
+            programCode.append("\txor ecx, ecx\n");
+            programCode.append("\tmov edx, 1\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tcmp eax, ebx\n");
+            programCode.append("\tcmove ecx, edx\n");
+            programCode.append("\tpush ecx\n");
         }
     }
 
