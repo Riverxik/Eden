@@ -72,15 +72,16 @@ public class Eden {
     static void compile(String sourceName) {
         try {
             String name = sourceName.split("[.]")[0];
+            System.out.printf("[INFO] Compiling %s...\n", sourceName);
             String cmdNasm = String.format("cmd.exe /c nasm -f win32 %s.asm", name);
             String cmdGoLink = String.format("cmd.exe /c golink /entry:Start /console kernel32.dll user32.dll %s.obj", name);
-            System.out.println(cmdNasm);
+            System.out.println("[CMD] " + cmdNasm);
             Process process = Runtime.getRuntime().exec(cmdNasm);
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 printErr("Error while compiling with nasm");
             }
-            System.out.println(cmdGoLink);
+            System.out.println("[CMD] " + cmdGoLink);
             process = Runtime.getRuntime().exec(cmdGoLink);
             exitCode = process.waitFor();
             if (exitCode != 0) {
