@@ -140,8 +140,7 @@ public class Eden {
         fw.write("section .text\n");
         // print
         fw.write(";In:\n");
-        fw.write(";eax - msgToPrint\n");
-        fw.write(";ebx - 0 if it's number otherwise string\n");
+        fw.write(";eax - pointerToMessageToPrint\n");
         fw.write("print:\n");
         fw.write("\tcmp eax, 4000000 ;IDK WTF IS THIS, SORRY\n");
         fw.write("\tjge _str\n");
@@ -201,7 +200,6 @@ public class Eden {
         fw.write("\tpop ebx\n");
         fw.write("\tpop eax\n");
         fw.write("\tmov eax, digitBuffer\n");
-        //fw.write("\tcall printStr\n");
         fw.write("\tret\n");
         // numCountLen
         fw.write("numCountLen:\n");
