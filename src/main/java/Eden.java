@@ -313,6 +313,7 @@ public class Eden {
     static void doStateNextIdentifier(Token currentToken) {
         if (currentToken.type == TokenType.COMMA) {
             index++;
+            edenVarList.add(new EdenVar(typeToDeclare));
             stackState.push(EdenState.IDENTIFIER);
         }
     }
