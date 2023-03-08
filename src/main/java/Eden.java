@@ -236,6 +236,7 @@ public class Eden {
         switch (state) {
             case PROGRAM: doStateProgram(); break;
             case STATEMENT: doStateStatement(currentToken); break;
+            case VAR_INITIALIZATION: doStateVarInitialization(currentToken); break;
             case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
             case IDENTIFIER: doStateIdentifier(currentToken); break;
@@ -281,7 +282,20 @@ public class Eden {
             stackState.push(EdenState.VAR_DECLARATION);
             return;
         }
+        if (currentToken.type == TokenType.SYMBOL) {
+            stackState.push(EdenState.VAR_INITIALIZATION);
+            return;
+        }
         printErrToken(currentToken, "Statement can't start with: ");
+    }
+
+    static void doStateVarInitialization(Token currentToken) {
+        String identifier = getIdentifier(currentToken);
+        EdenVar var = getEdenVarByIdentifier(identifier);
+        programStack.push(var.identifier);
+        index++;
+        stackState.push(EdenState.TOKEN_SEMICOLON);
+        stackState.push(EdenState.INITIALIZATION);
     }
 
     static void doStateVarDeclaration(Token currentToken) {
@@ -694,6 +708,7 @@ public class Eden {
     enum EdenState {
         PROGRAM,
         STATEMENT,
+        VAR_INITIALIZATION,
         VAR_DECLARATION,
         IDENTIFIER,
         INITIALIZATION,
