@@ -859,6 +859,7 @@ public class Eden {
             keywordList.add("void");
             keywordList.add("char");
             keywordList.add("bool");
+            keywordList.add("string");
             keywordList.add("int");
             keywordList.add("if");
             keywordList.add("else");
