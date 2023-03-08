@@ -102,7 +102,7 @@ public class Eden {
             FileWriter fw = new FileWriter(output);
             writeHeader(fw);
             writeData(fw);
-            writeVariables(fw);
+            writeVariables(fw, sourceName);
             writeText(fw);
             fw.write(programCode.toString());
             fw.write("\tcall exit\n");
@@ -132,11 +132,30 @@ public class Eden {
         }
     }
 
-    static void writeVariables(FileWriter fw) throws IOException {
+    static void writeVariables(FileWriter fw, String sourceName) throws IOException {
         fw.write("section .bss\n");
         fw.write("\tStdHandle resd 1\n");
         fw.write("\tdigitBuffer resb 100\n");
         fw.write("\tdigitBufferPos resb 8\n");
+        for (EdenVar var : edenVarList) {
+            switch (var.type) {
+                case INT: {
+                    fw.write("\t" + var.identifier + " resb 4\n");
+                    break;
+                }
+                case STRING:
+                case BOOL: {
+                    fw.write("\t" + var.identifier + " resb 1\n");
+                    break;
+                }
+                case CHAR: {
+                    fw.write("\t" + var.identifier + " resb 2\n");
+                    break;
+                }
+                case NONE:
+                default: fw.write("\t; There is some problem with var declaration in compiler, probably\n");
+            }
+        }
     }
 
     static void writeText(FileWriter fw) throws IOException {
@@ -480,9 +499,13 @@ public class Eden {
                 String address = "str_" + (stringConstants.size() - 1);
                 programCode.append("\t;OpPushString\n");
                 programCode.append("\tpush ").append(address).append("\n");
-            } else {
+            } else if (currentToken.type == TokenType.NUMBER) {
                 programCode.append("\t;OpPushNum\n");
                 programCode.append("\tpush ").append(currentToken.value).append("\n");
+            } else if (currentToken.type == TokenType.SYMBOL) {
+                programCode.append("\t;OpPushVar\n");
+                programCode.append("\tmov eax, [").append(currentToken.value).append("]\n");
+                programCode.append("\tpush eax\n");
             }
         }
     }
@@ -511,7 +534,10 @@ public class Eden {
             EdenVar var = getEdenVarByIdentifier(identifier);
             var.value = value;
         } else {
-            throw new NotImplementedException();
+            String identifier = String.valueOf(programStack.pop());
+            programCode.append("\t;OpInitialize\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tmov [").append(identifier).append("], eax\n");
         }
     }
 
