@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -102,7 +100,7 @@ public class Eden {
             FileWriter fw = new FileWriter(output);
             writeHeader(fw);
             writeData(fw);
-            writeVariables(fw, sourceName);
+            writeVariables(fw);
             writeText(fw);
             fw.write(programCode.toString());
             fw.write("\tcall exit\n");
@@ -132,7 +130,7 @@ public class Eden {
         }
     }
 
-    static void writeVariables(FileWriter fw, String sourceName) throws IOException {
+    static void writeVariables(FileWriter fw) throws IOException {
         fw.write("section .bss\n");
         fw.write("\tStdHandle resd 1\n");
         fw.write("\tdigitBuffer resb 100\n");
