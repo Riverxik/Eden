@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -16,7 +18,9 @@ public class Eden {
     static Stack<EdenState> stackState = new Stack<>();
     static Stack<Object> programStack = new Stack<>();
     static List<String> stringConstants = new ArrayList<>();
+    static List<EdenVar> edenVarList = new ArrayList<>();
     static StringBuilder programCode = new StringBuilder();
+    static EdenType typeToDeclare = EdenType.NONE;
     static int index = 0;
     static boolean isInterpreter = true;
 
@@ -232,7 +236,11 @@ public class Eden {
         switch (state) {
             case PROGRAM: doStateProgram(); break;
             case STATEMENT: doStateStatement(currentToken); break;
+            case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
+            case IDENTIFIER: doStateIdentifier(currentToken); break;
+            case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
+            case INITIALIZATION: doStateInitialization(currentToken); break;
             case TOKEN_SEMICOLON: doTokenSemicolon(currentToken); break;
             case TOKEN_CLOSE_BRACKET: doTokenCloseBracket(currentToken); break;
             case EXPRESSION: doStateExpression(currentToken); break;
@@ -242,6 +250,7 @@ public class Eden {
             case UNAR: doStateUnar(currentToken); break;
             case ARG: doStateArg(currentToken); break;
             case DO_PRINT: doOpPrint(); break;
+            case DO_INITIALIZE: doInitialize(); break;
             case DO_OP_PLUS: doOpPlus(); break;
             case DO_OP_MINUS: doOpMinus(); break;
             case DO_OP_MULTIPLY: doOpMultiply(); break;
@@ -268,7 +277,23 @@ public class Eden {
             stackState.push(EdenState.PRINT_STATEMENT);
             return;
         }
+        if (currentToken.type == TokenType.KEYWORD) {
+            stackState.push(EdenState.VAR_DECLARATION);
+            return;
+        }
         printErrToken(currentToken, "Statement can't start with: ");
+    }
+
+    static void doStateVarDeclaration(Token currentToken) {
+        try {
+            typeToDeclare = EdenType.valueOf(String.valueOf(currentToken.value).toUpperCase());
+        } catch (IllegalArgumentException ignored) {
+            printErrToken(currentToken, "Unknown Eden_Type keyword: ");
+        }
+        index++;
+        edenVarList.add(new EdenVar(typeToDeclare));
+        stackState.push(EdenState.TOKEN_SEMICOLON);
+        stackState.push(EdenState.IDENTIFIER);
     }
 
     static void doStatePrintStatement() {
@@ -276,6 +301,28 @@ public class Eden {
         stackState.push(EdenState.DO_PRINT);
         stackState.push(EdenState.TOKEN_SEMICOLON);
         stackState.push(EdenState.EXPRESSION);
+    }
+
+    static void doStateIdentifier(Token currentToken) {
+        declareVar(currentToken);
+        index++;
+        stackState.push(EdenState.NEXT_IDENTIFIER);
+        stackState.push(EdenState.INITIALIZATION);
+    }
+
+    static void doStateNextIdentifier(Token currentToken) {
+        if (currentToken.type == TokenType.COMMA) {
+            index++;
+            stackState.push(EdenState.IDENTIFIER);
+        }
+    }
+
+    static void doStateInitialization(Token currentToken) {
+        if (currentToken.type == TokenType.EQUALS) {
+            index++;
+            stackState.push(EdenState.DO_INITIALIZE);
+            stackState.push(EdenState.EXPRESSION);
+        }
     }
 
     static void doTokenSemicolon(Token currentToken) {
@@ -297,7 +344,7 @@ public class Eden {
     static void doStateExpression(Token currentToken) {
         TokenType cType = currentToken.type;
         if (cType == TokenType.PLUS || cType == TokenType.MINUS || cType == TokenType.OPEN_BRACKET
-                || cType == TokenType.NUMBER || cType == TokenType.STRING) {
+                || cType == TokenType.NUMBER || cType == TokenType.STRING || cType == TokenType.SYMBOL) {
             stackState.push(EdenState.LOGICAL);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
@@ -381,14 +428,15 @@ public class Eden {
             return;
         }
         if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING
-                || currentToken.type == TokenType.OPEN_BRACKET) {
+                || currentToken.type == TokenType.OPEN_BRACKET || currentToken.type == TokenType.SYMBOL) {
             stackState.push(EdenState.STARSLASH);
             stackState.push(EdenState.ARG);
         }
     }
 
     static void doStateArg(Token currentToken) {
-        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
+        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING
+                || currentToken.type == TokenType.SYMBOL) {
             stackState.push(EdenState.DO_SKIP);
             return;
         }
@@ -402,9 +450,12 @@ public class Eden {
 
     static void doStateSkip(Token currentToken) {
         if (isInterpreter) {
-             if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
-                 index++;
+            index++;
+            if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
                  programStack.push(currentToken.value);
+             }
+             if (currentToken.type == TokenType.SYMBOL) {
+                 programStack.push(getEdenVarByIdentifier(String.valueOf(currentToken.value)).value);
              }
         } else {
             index++;
@@ -432,6 +483,20 @@ public class Eden {
             programCode.append("\t;OpPrint\n");
             programCode.append("\tpop eax\n");
             programCode.append("\tcall print\n");
+        }
+    }
+
+    static void doInitialize() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Initializations require two elements, but found less");
+            }
+            Object value = programStack.pop();
+            String identifier = String.valueOf(programStack.pop());
+            EdenVar var = getEdenVarByIdentifier(identifier);
+            var.value = value;
+        } else {
+            throw new NotImplementedException();
         }
     }
 
@@ -587,6 +652,33 @@ public class Eden {
         }
     }
 
+    static String getIdentifier(Token currentToken) {
+        if (currentToken.type != TokenType.SYMBOL) {
+            printErrToken(currentToken, "Identifier must be type of SYMBOL, but found: ");
+        }
+        return String.valueOf(currentToken.value);
+    }
+
+    static void declareVar(Token currentToken) {
+        String identifier = getIdentifier(currentToken);
+        EdenVar var = edenVarList.get(edenVarList.size() - 1);
+        if (var.identifier.equalsIgnoreCase(identifier)) {
+            printErrToken(currentToken, "Identifier already declared: ");
+        }
+        var.identifier = identifier;
+        programStack.push(identifier);
+    }
+
+    static EdenVar getEdenVarByIdentifier(String identifier) {
+        for (EdenVar var : edenVarList) {
+            if (var.identifier.equalsIgnoreCase(identifier)) {
+                return var;
+            }
+        }
+        printErr("Identifier is not declared: " + identifier);
+        return new EdenVar(EdenType.NONE);
+    }
+
     static void printErrToken(Token token, String errMessage) {
         int offset = String.valueOf(token.value).length();
         System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, errMessage, token.type, token.value);
@@ -601,7 +693,12 @@ public class Eden {
     enum EdenState {
         PROGRAM,
         STATEMENT,
+        VAR_DECLARATION,
+        IDENTIFIER,
+        INITIALIZATION,
+        NEXT_IDENTIFIER,
         PRINT_STATEMENT,
+        DO_INITIALIZE,
         DO_PRINT,
         DO_SKIP,
         EXPRESSION,
@@ -621,6 +718,14 @@ public class Eden {
         STARSLASH,
         UNAR,
         ARG
+    }
+
+    enum EdenType {
+        NONE,
+        INT,
+        BOOL,
+        CHAR,
+        STRING
     }
 
     enum TokenType {
@@ -644,6 +749,18 @@ public class Eden {
         SYMBOL,
         KEYWORD,
         END
+    }
+
+    static class EdenVar {
+        EdenType type;
+        String identifier;
+        Object value;
+
+        EdenVar(EdenType type) {
+            this.type = type;
+            this.identifier = "";
+            this.value = null;
+        }
     }
 
     static class Token {
