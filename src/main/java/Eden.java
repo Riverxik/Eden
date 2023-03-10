@@ -66,6 +66,9 @@ public class Eden {
             choseRule(currentToken);
             currentToken = tokenList.get(index);
         }
+        if (programStack.size() > 0) {
+            printErr("Program stack must be empty by this point, something went wrong");
+        }
         if (!isInterpreter) {
             // Compilation
             writeFile(sourceName);
