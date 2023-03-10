@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -256,6 +258,10 @@ public class Eden {
             case VAR_INITIALIZATION: doStateVarInitialization(currentToken); break;
             case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
+            case IF_STATEMENT: doStateIfStatement(currentToken); break;
+            case ELSE_STATEMENT: doStateElseStatement(currentToken); break;
+            case COND_STATEMENT: doStateConditionStatement(); break;
+            case IGNORE_STATEMENT: doStateIgnoreStatement(currentToken); break;
             case IDENTIFIER: doStateIdentifier(currentToken); break;
             case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
             case INITIALIZATION: doStateInitialization(currentToken); break;
@@ -296,7 +302,14 @@ public class Eden {
             return;
         }
         if (currentToken.type == TokenType.KEYWORD) {
-            stackState.push(EdenState.VAR_DECLARATION);
+            String tValue = String.valueOf(currentToken.value);
+            if (tValue.equalsIgnoreCase("if")) {
+                index++;
+                stackState.push(EdenState.IF_STATEMENT);
+            } else {
+                // int, bool, string, char
+                stackState.push(EdenState.VAR_DECLARATION);
+            }
             return;
         }
         if (currentToken.type == TokenType.SYMBOL) {
@@ -332,6 +345,50 @@ public class Eden {
         stackState.push(EdenState.DO_PRINT);
         stackState.push(EdenState.TOKEN_SEMICOLON);
         stackState.push(EdenState.EXPRESSION);
+    }
+
+    static void doStateIfStatement(Token currentToken) {
+        if (currentToken.type == TokenType.OPEN_BRACKET) {
+            index++;
+            stackState.push(EdenState.ELSE_STATEMENT);
+            stackState.push(EdenState.COND_STATEMENT);
+            stackState.push(EdenState.TOKEN_CLOSE_BRACKET);
+            stackState.push(EdenState.EXPRESSION);
+        }
+    }
+
+    static void doStateElseStatement(Token currentToken) {
+        if (currentToken.type == TokenType.KEYWORD) {
+            String tValue = String.valueOf(currentToken.value);
+            if (tValue.equalsIgnoreCase("else")) {
+                index++;
+                stackState.push(EdenState.COND_STATEMENT);
+            }
+        } else {
+            programStack.pop();
+        }
+    }
+
+    static void doStateConditionStatement() {
+        if (isInterpreter) {
+            if (Integer.parseInt(String.valueOf(programStack.pop())) == 1) {
+                programStack.push(0);
+                stackState.push(EdenState.STATEMENT);
+            } else {
+                programStack.push(1);
+                stackState.push(EdenState.IGNORE_STATEMENT);
+            }
+        } else {
+            throw new NotImplementedException();
+        }
+    }
+
+    static void doStateIgnoreStatement(Token currentToken) {
+        index++;
+        TokenType cType = currentToken.type;
+        if (cType != TokenType.SEMICOLON && cType != TokenType.CLOSE_CURLY_BRACKET) {
+            stackState.push(EdenState.IGNORE_STATEMENT);
+        }
     }
 
     static void doStateIdentifier(Token currentToken) {
@@ -732,12 +789,16 @@ public class Eden {
     enum EdenState {
         PROGRAM,
         STATEMENT,
+        COND_STATEMENT,
         VAR_INITIALIZATION,
         VAR_DECLARATION,
         IDENTIFIER,
         INITIALIZATION,
         NEXT_IDENTIFIER,
         PRINT_STATEMENT,
+        IF_STATEMENT,
+        ELSE_STATEMENT,
+        IGNORE_STATEMENT,
         DO_INITIALIZE,
         DO_PRINT,
         DO_SKIP,
