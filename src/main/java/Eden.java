@@ -365,7 +365,11 @@ public class Eden {
             String tValue = String.valueOf(currentToken.value);
             if (tValue.equalsIgnoreCase("else")) {
                 index++;
-                stackState.push(EdenState.COND_STATEMENT);
+                if (Integer.parseInt(String.valueOf(programStack.pop())) == 1) {
+                    stackState.push(EdenState.STATEMENT);
+                } else {
+                    stackState.push(EdenState.IGNORE_STATEMENT);
+                }
             }
         } else {
             programStack.pop();
