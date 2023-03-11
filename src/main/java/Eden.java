@@ -418,6 +418,8 @@ public class Eden {
             index++;
             stackState.push(EdenState.DO_INITIALIZE);
             stackState.push(EdenState.EXPRESSION);
+        } else {
+            programStack.pop();
         }
     }
 
