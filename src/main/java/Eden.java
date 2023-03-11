@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -360,6 +358,10 @@ public class Eden {
     }
 
     static void doStateWhileStatement() {
+        if (!isInterpreter) {
+            programCode.append("\t; OpWhile\n");
+            programCode.append("addr_").append(index).append(":\n");
+        }
         index++;
         stackState.push(EdenState.WHILE_COND_STATEMENT);
         stackState.push(EdenState.EXPRESSION);
@@ -377,7 +379,13 @@ public class Eden {
             index = currentToken.linkIp; // goto while
             stackState.push(EdenState.WHILE_STATEMENT);
         } else {
-            throw new NotImplementedException();
+            int linkIp = currentToken.linkIp;
+            if (linkIp == 0) {
+                printErrToken(currentToken, "while block instruction does not have a reference to the start of its block. Please call lexer.crossReference() before trying to compile it");
+            }
+            programCode.append("\t; OpEndWhile\n");
+            programCode.append("\tjmp addr_").append(linkIp).append("\n");
+            programCode.append("addr_").append(++index).append(":\n");
         }
     }
 
@@ -425,7 +433,16 @@ public class Eden {
                 stackState.push(EdenState.BLOCK_STATEMENT);
             }
         } else {
-            throw new NotImplementedException();
+            int linkIp = currentToken.linkIp;
+            if (linkIp == 0) {
+                printErrToken(currentToken, "while block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
+            }
+            programCode.append("\t; OpJumpWhile\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\ttest eax, eax\n");
+            programCode.append("\tjz addr_").append(linkIp).append("\n");
+            stackState.push(EdenState.END_WHILE);
+            stackState.push(EdenState.BLOCK_STATEMENT);
         }
     }
 
@@ -438,9 +455,6 @@ public class Eden {
                 }
                 index = currentToken.linkIp;
             }
-            if (tokenList.get(index).type == TokenType.OPEN_CURLY_BRACKET) {
-                stackState.push(EdenState.BLOCK_STATEMENT);
-            }
         } else {
             int linkIp = currentToken.linkIp;
             if (linkIp == 0) {
@@ -450,6 +464,9 @@ public class Eden {
             programCode.append("\tpop eax\n");
             programCode.append("\ttest eax, eax\n");
             programCode.append("\tjz addr_").append(linkIp).append("\n");
+        }
+        if (tokenList.get(index).type == TokenType.OPEN_CURLY_BRACKET) {
+            stackState.push(EdenState.BLOCK_STATEMENT);
         }
     }
 
