@@ -379,6 +379,10 @@ public class Eden {
     static void doStateConditionStatement(Token currentToken) {
         if (isInterpreter) {
             if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
+                int linkIp = currentToken.linkIp;
+                if (linkIp == 0) {
+                    printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
+                }
                 index = currentToken.linkIp;
             }
         } else {
@@ -398,6 +402,8 @@ public class Eden {
             index++;
             stackState.push(EdenState.NEXT_STATEMENT);
             stackState.push(EdenState.STATEMENT);
+        } else {
+            printErrToken(currentToken, "Block of statements must start with [{], but found: ");
         }
     }
 
