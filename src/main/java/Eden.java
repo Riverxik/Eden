@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -364,12 +362,17 @@ public class Eden {
         if (currentToken.type == TokenType.CLOSE_CURLY_BRACKET) {
             index++;
         }
-        currentToken = tokenList.get(index);
-        if (currentToken.type == TokenType.KEYWORD) {
-            String tValue = String.valueOf(currentToken.value);
-            if (tValue.equalsIgnoreCase("else")) {
-                index = tokenList.get(index).linkIp;
+        if (isInterpreter) {
+            currentToken = tokenList.get(index);
+            if (currentToken.type == TokenType.KEYWORD) {
+                String tValue = String.valueOf(currentToken.value);
+                if (tValue.equalsIgnoreCase("else")) {
+                    index = tokenList.get(index).linkIp;
+                }
             }
+        } else {
+            programCode.append("\t; End if\n");
+            programCode.append("addr_").append(currentToken.index).append(":\n");
         }
     }
 
@@ -379,7 +382,14 @@ public class Eden {
                 index = currentToken.linkIp;
             }
         } else {
-            throw new NotImplementedException();
+            int linkIp = currentToken.linkIp;
+            if (linkIp == 0) {
+                printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
+            }
+            programCode.append("\t; OpIf\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\ttest eax, eax\n");
+            programCode.append("\tjz addr_").append(linkIp).append("\n");
         }
     }
 
