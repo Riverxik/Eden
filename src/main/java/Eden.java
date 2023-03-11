@@ -371,8 +371,21 @@ public class Eden {
                 }
             }
         } else {
-            programCode.append("\t; End if\n");
-            programCode.append("addr_").append(currentToken.index).append(":\n");
+            Token nextToken = tokenList.get(index);
+            if (String.valueOf(nextToken.value).equalsIgnoreCase("else")) {
+                if (nextToken.linkIp == 0) {
+                    printErrToken(nextToken, "else block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
+                }
+                programCode.append("\t; Else\n");
+                programCode.append("\tjmp addr_").append(nextToken.linkIp - 1).append("\n");
+                programCode.append("addr_").append(currentToken.index + 2).append(":\n");
+                index++;
+                stackState.push(EdenState.ELSE_STATEMENT);
+                stackState.push(EdenState.BLOCK_STATEMENT);
+            } else {
+                programCode.append("\t; End if\n");
+                programCode.append("addr_").append(currentToken.index).append(":\n");
+            }
         }
     }
 
@@ -381,7 +394,7 @@ public class Eden {
             if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
                 int linkIp = currentToken.linkIp;
                 if (linkIp == 0) {
-                    printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
+                    printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to interpret it");
                 }
                 index = currentToken.linkIp;
             }
