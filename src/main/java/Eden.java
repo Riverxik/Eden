@@ -59,6 +59,8 @@ public class Eden {
         lexer.tokenize();
         lexer.clearComments();
 
+        lexer.crossReference();
+
         // Parsing.
         stackState.push(EdenState.PROGRAM);
         Token currentToken = tokenList.get(index);
@@ -261,10 +263,11 @@ public class Eden {
             case VAR_INITIALIZATION: doStateVarInitialization(currentToken); break;
             case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
-            case IF_STATEMENT: doStateIfStatement(currentToken); break;
-            case ELSE_STATEMENT: doStateElseStatement(currentToken); break;
+            case IF_STATEMENT: doStateIfStatement(); break;
             case COND_STATEMENT: doStateConditionStatement(); break;
-            case IGNORE_STATEMENT: doStateIgnoreStatement(currentToken); break;
+            case BLOCK_STATEMENT: doStateBlockStatement(currentToken); break;
+            case ELSE_STATEMENT: doStateElseStatement(currentToken); break;
+            case NEXT_STATEMENT: doStateNextStatement(currentToken); break;
             case IDENTIFIER: doStateIdentifier(currentToken); break;
             case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
             case INITIALIZATION: doStateInitialization(currentToken); break;
@@ -307,7 +310,6 @@ public class Eden {
         if (currentToken.type == TokenType.KEYWORD) {
             String tValue = String.valueOf(currentToken.value);
             if (tValue.equalsIgnoreCase("if")) {
-                index++;
                 stackState.push(EdenState.IF_STATEMENT);
             } else {
                 // int, bool, string, char
@@ -350,51 +352,50 @@ public class Eden {
         stackState.push(EdenState.EXPRESSION);
     }
 
-    static void doStateIfStatement(Token currentToken) {
-        if (currentToken.type == TokenType.OPEN_BRACKET) {
-            index++;
-            stackState.push(EdenState.ELSE_STATEMENT);
-            stackState.push(EdenState.COND_STATEMENT);
-            stackState.push(EdenState.TOKEN_CLOSE_BRACKET);
-            stackState.push(EdenState.EXPRESSION);
-        }
+    static void doStateIfStatement() {
+        index++;
+        stackState.push(EdenState.ELSE_STATEMENT);
+        stackState.push(EdenState.BLOCK_STATEMENT);
+        stackState.push(EdenState.COND_STATEMENT);
+        stackState.push(EdenState.EXPRESSION);
     }
 
     static void doStateElseStatement(Token currentToken) {
+        if (currentToken.type == TokenType.CLOSE_CURLY_BRACKET) {
+            index++;
+        }
+        currentToken = tokenList.get(index);
         if (currentToken.type == TokenType.KEYWORD) {
             String tValue = String.valueOf(currentToken.value);
             if (tValue.equalsIgnoreCase("else")) {
-                index++;
-                if (Integer.parseInt(String.valueOf(programStack.pop())) == 1) {
-                    stackState.push(EdenState.STATEMENT);
-                } else {
-                    stackState.push(EdenState.IGNORE_STATEMENT);
-                }
+                index = tokenList.get(index).linkIp;
             }
-        } else {
-            programStack.pop();
         }
     }
 
     static void doStateConditionStatement() {
         if (isInterpreter) {
-            if (Integer.parseInt(String.valueOf(programStack.pop())) == 1) {
-                programStack.push(0);
-                stackState.push(EdenState.STATEMENT);
-            } else {
-                programStack.push(1);
-                stackState.push(EdenState.IGNORE_STATEMENT);
+            if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
+                index = tokenList.get(index).linkIp;
             }
         } else {
             throw new NotImplementedException();
         }
     }
 
-    static void doStateIgnoreStatement(Token currentToken) {
-        index++;
-        TokenType cType = currentToken.type;
-        if (cType != TokenType.SEMICOLON && cType != TokenType.CLOSE_CURLY_BRACKET) {
-            stackState.push(EdenState.IGNORE_STATEMENT);
+    static void doStateBlockStatement(Token currentToken) {
+        if (currentToken.type == TokenType.OPEN_CURLY_BRACKET) {
+            index++;
+            stackState.push(EdenState.NEXT_STATEMENT);
+            stackState.push(EdenState.STATEMENT);
+        }
+    }
+
+    static void doStateNextStatement(Token currentToken) {
+        // There is might be a bug
+        if (currentToken.type != TokenType.CLOSE_CURLY_BRACKET) {
+            stackState.push(EdenState.NEXT_STATEMENT);
+            stackState.push(EdenState.STATEMENT);
         }
     }
 
@@ -799,6 +800,7 @@ public class Eden {
         PROGRAM,
         STATEMENT,
         COND_STATEMENT,
+        NEXT_STATEMENT,
         VAR_INITIALIZATION,
         VAR_DECLARATION,
         IDENTIFIER,
@@ -806,8 +808,8 @@ public class Eden {
         NEXT_IDENTIFIER,
         PRINT_STATEMENT,
         IF_STATEMENT,
+        BLOCK_STATEMENT,
         ELSE_STATEMENT,
-        IGNORE_STATEMENT,
         DO_INITIALIZE,
         DO_PRINT,
         DO_SKIP,
@@ -877,6 +879,8 @@ public class Eden {
         TokenType type;
         Object value;
         Location loc;
+        int index;
+        int linkIp;
 
         Token(TokenType type, Object value, Location loc) {
             this.type = type;
@@ -884,9 +888,13 @@ public class Eden {
             this.loc = loc;
         }
 
+        void setIndex(int index) {
+            this.index = index;
+        }
+
         @Override
         public String toString() {
-            return String.format("%s[%s][%d:%d]", type, value, loc.line, loc.column);
+            return String.format("%s[%s][%d:%d][%d<->%d]", type, value, loc.line, loc.column, index, linkIp);
         }
     }
 
@@ -924,6 +932,47 @@ public class Eden {
             initKeywords();
         }
 
+        void crossReference() {
+            Stack<Integer> stack = new Stack<>();
+            for (Token t : tokenList) {
+                if (String.valueOf(t.value).equalsIgnoreCase("if")) {
+                    stack.push(t.index);
+                }
+                if (String.valueOf(t.value).equalsIgnoreCase("else")) {
+                    int closeBracketIp = t.index - 1;
+                    Token cbToken = tokenList.get(closeBracketIp);
+                    if (cbToken.type == TokenType.CLOSE_CURLY_BRACKET) {
+                        t.linkIp = cbToken.linkIp;
+                        stack.push(t.index);
+                    } else {
+                        printErr("else can only be used in `if`-blocks");
+                    }
+                }
+                if (t.type == TokenType.OPEN_CURLY_BRACKET) {
+                    int blockIp = stack.pop();
+                    String blockName = String.valueOf(tokenList.get(blockIp).value);
+                    if (blockName.equalsIgnoreCase("if")) {
+                        tokenList.get(blockIp).linkIp = t.index;
+                        stack.push(t.index);
+                    }
+                    if (blockName.equalsIgnoreCase("else")) {
+                        tokenList.get(tokenList.get(blockIp).linkIp).linkIp = t.index;
+                        stack.push(blockIp);
+                    }
+                }
+                if (t.type == TokenType.CLOSE_CURLY_BRACKET) {
+                    int openBracketIp = stack.pop();
+                    if (tokenList.get(openBracketIp).type == TokenType.OPEN_CURLY_BRACKET) {
+                        tokenList.get(openBracketIp).linkIp = t.index;
+                        t.linkIp = openBracketIp;
+                    }
+                    if (String.valueOf(tokenList.get(openBracketIp).value).equalsIgnoreCase("else")) {
+                        tokenList.get(openBracketIp).linkIp = t.index + 1; // +1
+                    }
+                }
+            }
+        }
+
         void initKeywords() {
             keywordList.add("class");
             keywordList.add("void");
@@ -952,6 +1001,10 @@ public class Eden {
                 }
             }
             tokenList.removeAll(comments);
+            int i = 0;
+            for (Token t : tokenList) {
+                t.setIndex(i++);
+            }
         }
 
         void tokenize() {
