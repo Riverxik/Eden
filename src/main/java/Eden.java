@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -261,10 +263,13 @@ public class Eden {
             case VAR_INITIALIZATION: doStateVarInitialization(currentToken); break;
             case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
+            case WHILE_STATEMENT: doStateWhileStatement(); break;
+            case WHILE_COND_STATEMENT: doStateWhileConditionStatement(currentToken); break;
+            case END_WHILE: doStateEndWhile(currentToken); break;
             case IF_STATEMENT: doStateIfStatement(); break;
-            case COND_STATEMENT: doStateConditionStatement(currentToken); break;
+            case IF_COND_STATEMENT: doStateIfConditionStatement(currentToken); break;
             case BLOCK_STATEMENT: doStateBlockStatement(currentToken); break;
-            case ELSE_STATEMENT: doStateElseStatement(currentToken); break;
+            case ELSE_STATEMENT: doStateEndIfElseStatement(currentToken); break;
             case NEXT_STATEMENT: doStateNextStatement(currentToken); break;
             case IDENTIFIER: doStateIdentifier(currentToken); break;
             case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
@@ -307,7 +312,9 @@ public class Eden {
         }
         if (currentToken.type == TokenType.KEYWORD) {
             String tValue = String.valueOf(currentToken.value);
-            if (tValue.equalsIgnoreCase("if")) {
+            if (tValue.equalsIgnoreCase("while")) {
+                stackState.push(EdenState.WHILE_STATEMENT);
+            } else if (tValue.equalsIgnoreCase("if")) {
                 stackState.push(EdenState.IF_STATEMENT);
             } else if (tValue.equalsIgnoreCase("int") || tValue.equalsIgnoreCase("bool")
                     || tValue.equalsIgnoreCase("string") || tValue.equalsIgnoreCase("char")){
@@ -352,15 +359,29 @@ public class Eden {
         stackState.push(EdenState.EXPRESSION);
     }
 
-    static void doStateIfStatement() {
+    static void doStateWhileStatement() {
         index++;
-        stackState.push(EdenState.ELSE_STATEMENT);
-        stackState.push(EdenState.BLOCK_STATEMENT);
-        stackState.push(EdenState.COND_STATEMENT);
+        stackState.push(EdenState.WHILE_COND_STATEMENT);
         stackState.push(EdenState.EXPRESSION);
     }
 
-    static void doStateElseStatement(Token currentToken) {
+    static void doStateIfStatement() {
+        index++;
+        stackState.push(EdenState.ELSE_STATEMENT);
+        stackState.push(EdenState.IF_COND_STATEMENT);
+        stackState.push(EdenState.EXPRESSION);
+    }
+
+    static void doStateEndWhile(Token currentToken) {
+        if (isInterpreter) {
+            index = currentToken.linkIp; // goto while
+            stackState.push(EdenState.WHILE_STATEMENT);
+        } else {
+            throw new NotImplementedException();
+        }
+    }
+
+    static void doStateEndIfElseStatement(Token currentToken) {
         if (currentToken.type == TokenType.CLOSE_CURLY_BRACKET) {
             index++;
         }
@@ -391,7 +412,24 @@ public class Eden {
         }
     }
 
-    static void doStateConditionStatement(Token currentToken) {
+    static void doStateWhileConditionStatement(Token currentToken) {
+        if (isInterpreter) {
+            if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
+                int linkIp = currentToken.linkIp;
+                if (linkIp == 0) {
+                    printErrToken(currentToken, "while block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to interpret it");
+                }
+                index = currentToken.linkIp;
+            } else {
+                stackState.push(EdenState.END_WHILE);
+                stackState.push(EdenState.BLOCK_STATEMENT);
+            }
+        } else {
+            throw new NotImplementedException();
+        }
+    }
+
+    static void doStateIfConditionStatement(Token currentToken) {
         if (isInterpreter) {
             if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
                 int linkIp = currentToken.linkIp;
@@ -399,6 +437,9 @@ public class Eden {
                     printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to interpret it");
                 }
                 index = currentToken.linkIp;
+            }
+            if (tokenList.get(index).type == TokenType.OPEN_CURLY_BRACKET) {
+                stackState.push(EdenState.BLOCK_STATEMENT);
             }
         } else {
             int linkIp = currentToken.linkIp;
@@ -830,17 +871,20 @@ public class Eden {
     enum EdenState {
         PROGRAM,
         STATEMENT,
-        COND_STATEMENT,
-        NEXT_STATEMENT,
         VAR_INITIALIZATION,
         VAR_DECLARATION,
         IDENTIFIER,
         INITIALIZATION,
         NEXT_IDENTIFIER,
         PRINT_STATEMENT,
+        WHILE_STATEMENT,
+        WHILE_COND_STATEMENT,
+        END_WHILE,
         IF_STATEMENT,
-        BLOCK_STATEMENT,
+        IF_COND_STATEMENT,
         ELSE_STATEMENT,
+        NEXT_STATEMENT,
+        BLOCK_STATEMENT,
         DO_INITIALIZE,
         DO_PRINT,
         DO_SKIP,
@@ -969,6 +1013,9 @@ public class Eden {
                 if (String.valueOf(t.value).equalsIgnoreCase("if")) {
                     stack.push(t.index);
                 }
+                if (String.valueOf(t.value).equalsIgnoreCase("while")) {
+                    stack.push(t.index);
+                }
                 if (String.valueOf(t.value).equalsIgnoreCase("else")) {
                     int closeBracketIp = t.index - 1;
                     Token cbToken = tokenList.get(closeBracketIp);
@@ -984,18 +1031,31 @@ public class Eden {
                     String blockName = String.valueOf(tokenList.get(blockIp).value);
                     if (blockName.equalsIgnoreCase("if")) {
                         tokenList.get(blockIp).linkIp = t.index;
+                        t.linkIp = blockIp;
                         stack.push(t.index);
                     }
                     if (blockName.equalsIgnoreCase("else")) {
                         tokenList.get(tokenList.get(blockIp).linkIp).linkIp = t.index;
                         stack.push(blockIp);
                     }
+                    if (blockName.equalsIgnoreCase("while")) {
+                        tokenList.get(blockIp).linkIp = t.index;
+                        t.linkIp = blockIp;
+                        stack.push(t.index);
+                    }
                 }
                 if (t.type == TokenType.CLOSE_CURLY_BRACKET) {
                     int openBracketIp = stack.pop();
                     if (tokenList.get(openBracketIp).type == TokenType.OPEN_CURLY_BRACKET) {
-                        tokenList.get(openBracketIp).linkIp = t.index;
-                        t.linkIp = openBracketIp;
+                        Token keywordToken = tokenList.get(tokenList.get(openBracketIp).linkIp);
+                        String keywordValue = String.valueOf(keywordToken.value);
+                        if (keywordValue.equalsIgnoreCase("if")) {
+                            tokenList.get(openBracketIp).linkIp = t.index;
+                            t.linkIp = openBracketIp;
+                        } else if (keywordValue.equalsIgnoreCase("while")) {
+                            tokenList.get(openBracketIp).linkIp = t.index + 1;
+                            t.linkIp = keywordToken.index; // +1
+                        }
                     }
                     if (String.valueOf(tokenList.get(openBracketIp).value).equalsIgnoreCase("else")) {
                         tokenList.get(openBracketIp).linkIp = t.index + 1; // +1
