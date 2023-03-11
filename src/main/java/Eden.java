@@ -264,7 +264,7 @@ public class Eden {
             case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
             case PRINT_STATEMENT: doStatePrintStatement(); break;
             case IF_STATEMENT: doStateIfStatement(); break;
-            case COND_STATEMENT: doStateConditionStatement(); break;
+            case COND_STATEMENT: doStateConditionStatement(currentToken); break;
             case BLOCK_STATEMENT: doStateBlockStatement(currentToken); break;
             case ELSE_STATEMENT: doStateElseStatement(currentToken); break;
             case NEXT_STATEMENT: doStateNextStatement(currentToken); break;
@@ -373,10 +373,10 @@ public class Eden {
         }
     }
 
-    static void doStateConditionStatement() {
+    static void doStateConditionStatement(Token currentToken) {
         if (isInterpreter) {
             if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
-                index = tokenList.get(index).linkIp;
+                index = currentToken.linkIp;
             }
         } else {
             throw new NotImplementedException();
