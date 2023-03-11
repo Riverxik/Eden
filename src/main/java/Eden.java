@@ -309,9 +309,11 @@ public class Eden {
             String tValue = String.valueOf(currentToken.value);
             if (tValue.equalsIgnoreCase("if")) {
                 stackState.push(EdenState.IF_STATEMENT);
-            } else {
-                // int, bool, string, char
+            } else if (tValue.equalsIgnoreCase("int") || tValue.equalsIgnoreCase("bool")
+                    || tValue.equalsIgnoreCase("string") || tValue.equalsIgnoreCase("char")){
                 stackState.push(EdenState.VAR_DECLARATION);
+            } else {
+                printErrToken(currentToken, "Unknown keyword: ");
             }
             return;
         }
