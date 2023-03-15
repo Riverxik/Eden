@@ -1201,7 +1201,7 @@ public class Eden {
             if (keywordList.contains(tokenValue)) {
                 tokenList.add(new Token(TokenType.KEYWORD, tokenValue, new Location(line, column)));
             } else {
-                tokenList.add(new Token(TokenType.SYMBOL, tokenValue, new Location(line, column)));
+                tokenList.add(new Token(TokenType.SYMBOL, "Eden_" + tokenValue, new Location(line, column)));
             }
         }
 
