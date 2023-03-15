@@ -142,11 +142,11 @@ public class Eden {
         fw.write("\tdigitBufferPos resb 8\n");
         for (EdenVar var : edenVarList) {
             switch (var.type) {
+                case STRING:
                 case INT: {
                     fw.write("\t" + var.identifier + " resb 4\n");
                     break;
                 }
-                case STRING:
                 case BOOL: {
                     fw.write("\t" + var.identifier + " resb 1\n");
                     break;
