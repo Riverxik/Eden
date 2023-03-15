@@ -130,7 +130,7 @@ public class Eden {
         fw.write("\tstr_NL db `\\r\\n`\n");
         for (String stringConstant : stringConstants) {
             String fullName = "str_" + index++;
-            fw.write("\t" + fullName + " db `" + stringConstant + "`,0\n");
+            fw.write("\t" + fullName + " db `" + stringConstant.replaceAll("\\\\n", "\\\\r\\\\n") + "`,0\n");
             //fw.write("\t" + fullName + "Len EQU $-" + fullName + "\n");
         }
     }
@@ -669,8 +669,8 @@ public class Eden {
             if (programStack.size() < 1) {
                 printErr("Nothing to print");
             }
-            Object value = programStack.pop();
-            System.out.println(value);
+            String value = String.valueOf(programStack.pop());
+            System.out.printf(value.replaceAll("[\\\\]", "%"));
         } else {
             programCode.append("\t;OpPrint\n");
             programCode.append("\tpop eax\n");
