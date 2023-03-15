@@ -1,0 +1,30 @@
+int a = 34, b = 35;
+int c;
+int d, e = 3;
+if 34 + 35 = 69 {
+    c = a + b;
+    if c > 40 {
+        if (c > 0) {
+            if c/c {
+                ~ "Hello\n";
+            } else {
+                ~ "Never executed";
+            }
+        }
+        ~ "C is greater than 40\n";
+    } else {
+        ~ "C smaller than 40";
+    }
+    ~ c;
+    d = 1;
+} else {
+    ~ "Hello, Eden!";
+}
+~ "\nd = "; ~ d;
+~ "\ne = "; ~ e;
+int print;
+if e = 3 {
+    ~ "\ntest\n";
+    print = e + 1;
+}
+~ print;
