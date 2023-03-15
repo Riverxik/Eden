@@ -7,7 +7,7 @@ Main goal for this project is make a simple oop self-hosted language.
 Just because it's fun, and I can (can I?).
 
 Eden is planned to be:
-- [ ] Compiled
+- [x] Compiled
 - [ ] Turing-complete
 - [ ] Self-hosted (Java is used only as an initial bootstrap, once the language is mature enough I'm going to rewrite it in itself)
 
@@ -21,13 +21,43 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] Constructors
 - [x] Type: Integer
 - [x] Type: Boolean
-- [ ] Type: Char
-- [ ] Type: String
+- [x] Type: Char
+- [x] Type: String
 - [ ] List structure
 - [ ] Stack structure
 - [x] Conditional statements (if-else)
 - [x] Loop statement (probably while)
 ---
+
+## Quick start
+Compiler use interpreter mode by default for now. To specify source file use `-s` flag:
+```shell
+$ java -jar Eden.jar -s hello.eden
+```
+
+Also, you can compile your program to native executable. Use `-c` to compile.
+```shell
+$ java -jar Eden.jar -c -s hello.eden
+```
+
+You can use `-r` to execute automatically after successful compilation.
+```shell
+$ java -jar Eden.jar -c -r -s hello.eden
+```
+
+### How exactly compilation works:
+Compilation process made though [nasm](https://www.nasm.us/) and [golink](https://www.godevtool.com/) in three steps:
+1. Lexing, parsing `.eden` and making `.asm` file
+2. Compile `.asm` file to `.obj`
+3. Linking `.obj` file to native executable `.exe`
+```shell
+$ nasm -f win32 Test.asm
+$ golink /entry:Start /console kernel32.dll user32.dll Test.obj 
+$ file Test
+Test: PE32 executable (console) Intel 80386, for MS Windows
+```
+
+I use 32 bit for now, for no reason, just because I can. Maybe I will change it to 64 bit later. Will see.
 
 ## Statements
 
@@ -53,7 +83,7 @@ Conditional statements are used to perform different actions based on different 
 
 Syntax:
 ```
-if (expr) { 
+if <expr> { 
     // statements when expression returns 1; 
 } else {
     // statements when expression returns 0;
