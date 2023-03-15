@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,8 +22,9 @@ public class Eden {
     static EdenType typeToDeclare = EdenType.NONE;
     static int index = 0;
     static boolean isInterpreter = true;
+    static boolean isRunAfterCompilation = false;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         // Args
         if (args.length == 0) {
             System.out.println("Usage: eden -s scrName.eden");
@@ -41,6 +43,9 @@ public class Eden {
             }
             if (args[i].equalsIgnoreCase("-c")) {
                 isInterpreter = false;
+            }
+            if (args[i].equalsIgnoreCase("-r")) {
+                isRunAfterCompilation = true;
             }
             i++;
         }
@@ -72,11 +77,36 @@ public class Eden {
         if (!isInterpreter) {
             // Compilation
             writeFile(sourceName);
-            compile(sourceName);
+            int isSuccess = compile(sourceName);
+            if (isSuccess == 0 && isRunAfterCompilation) {
+                System.out.println(run(sourceName.split("[.]")[0]+".exe"));
+            }
         }
     }
 
-    static void compile(String sourceName) {
+    private static String run(String execCmd) throws IOException, InterruptedException {
+        Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            System.err.println("Error while execute command: " + execCmd);
+            InputStream errStream = process.getErrorStream();
+            while (errStream.available() > 0) {
+                System.err.print(readInputStream(errStream));
+            }
+            errStream.close();
+        }
+        return readInputStream(process.getInputStream());
+    }
+
+    private static String readInputStream(InputStream inputStream) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        while (inputStream.available() > 0) {
+            sb.append((char)(inputStream.read()));
+        }
+        return sb.toString();
+    }
+
+    static int compile(String sourceName) {
         try {
             String name = sourceName.split("[.]")[0];
             System.out.printf("[INFO] Compiling %s...\n", sourceName);
@@ -94,8 +124,10 @@ public class Eden {
             if (exitCode != 0) {
                 printErr("Error while linking with golink");
             }
+            return 0;
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
+            return -1;
         }
     }
 
