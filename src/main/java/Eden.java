@@ -150,9 +150,9 @@ public class Eden {
     }
 
     static void writeHeader(FileWriter fw) throws IOException {
-        fw.write("extern _GetStdHandle@4\n" +
-                     "extern _WriteFile@20\n" +
-                     "extern _ExitProcess@4\n" +
+        fw.write("extern GetStdHandle\n" +
+                     "extern WriteFile\n" +
+                     "extern ExitProcess\n" +
                      "\n" +
                      "global Start\n");
     }
@@ -225,7 +225,7 @@ public class Eden {
         fw.write("\tpush ebx\n");
         fw.write("\tpush eax\n");
         fw.write("\tpush dword [StdHandle]\n");
-        fw.write("\tcall _WriteFile@20\n");
+        fw.write("\tcall WriteFile\n");
         fw.write("\tpop eax\n");
         fw.write("\tret\n");
         // printInt
@@ -277,12 +277,12 @@ public class Eden {
         fw.write("exit:\n");
         fw.write("\t;End of the program\n");
         fw.write("\tpush 0\n");
-        fw.write("\tcall _ExitProcess@4\n");
+        fw.write("\tcall ExitProcess\n");
         // Start
         fw.write("Start:\n");
         fw.write("\t;Get the console handler\n");
         fw.write("\tpush -11\n");
-        fw.write("\tcall _GetStdHandle@4\n");
+        fw.write("\tcall GetStdHandle\n");
         fw.write("\tmov dword [StdHandle], eax\n");
     }
 
@@ -768,12 +768,12 @@ public class Eden {
         if (isInterpreter) {
             String nameOfWinCall = String.valueOf(programStack.get(stackSizeBeforeWinCallName));
             switch (nameOfWinCall) {
-                case "_GetStdHandle@4": {
+                case "GetStdHandle": {
                     int handleValue = Integer.parseInt(String.valueOf(programStack.pop()));
                     programStack.pop();
                     programStack.push(MAX_C_INTEGER + handleValue);
                 } break;
-                case "_WriteFile@20": {
+                case "WriteFile": {
                     String handler = String.valueOf(programStack.pop());
                     String strToPrint = String.valueOf(programStack.pop());
                     int sizeOfStr = Integer.parseInt(String.valueOf(programStack.pop()));

@@ -125,8 +125,8 @@ Get a console handler and print `Hello world!` through `WriteFile` wincall (kern
 int stdOutHandle;
 int writtnBuf;
 int resultCode;
-stdOutHandle = wincall("_GetStdHandle@4", -11); // Getting the stdOut handler
-resultCode = wincall("_WriteFile@20", 0, writtnBuf, 14, "Hello world!\n", stdOutHandle); // Performs a wincall
+stdOutHandle = wincall("GetStdHandle", -11); // Getting the stdOut handler
+resultCode = wincall("WriteFile", 0, writtnBuf, 14, "Hello world!\n", stdOutHandle); // Performs a wincall
 ~ resultCode; // Check that wincall was successful. Returns non zero value if it was.
 ```
 
