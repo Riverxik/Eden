@@ -1383,6 +1383,7 @@ public class Eden {
                     tokenList.add(new Token(TokenType.COMMA, currentChar, new Location(line, column)));
                     break;
                 }
+                case '.': break;
                 default: {
                     printErrToken(new Token(TokenType.SYMBOL, currentChar, new Location(line, column)), "Lexer: Unknown character");
                 }

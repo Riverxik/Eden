@@ -1,0 +1,35 @@
+// Reading content from file called "test.txt" using wincalls and printing it in the console
+// For now it works only in compilation (java -jar Eden.jar -c -r -s ReadFile.eden)
+int hHeap, hConOut, hSelfFile, hReadBuf;
+int lpFileSize;
+string fileName = "test.txt";
+// Constants
+int readFile = 1;
+int openExisting = 3;
+int heapZeroMem = 8;
+int errorCode = 4294967295;
+// For output
+int result;
+int lpBytesWritten;
+
+hHeap = wincall("GetProcessHeap");
+hConOut = wincall("GetStdHandle", -11); // Get std out handle
+// Trying to open the file
+hSelfFile = wincall("CreateFileA", 0, 0, openExisting, 0, 0, readFile, fileName);
+if (hSelfFile = errorCode) = 0 {
+	// Successfully opened the file, trying to get its size.
+    lpFileSize = wincall("GetFileSize", 0, hSelfFile);
+	// Allocate enough memory to read the whole content
+    hReadBuf = wincall("HeapAlloc", lpFileSize + 1, heapZeroMem, hHeap);
+    // Reading into memory
+    result = wincall("ReadFile", 0, lpBytesWritten, lpFileSize, hReadBuf, hSelfFile);
+	// Do not forget to close handler
+    result = wincall("CloseHandle", hSelfFile);
+    // Print the stuff into console
+	~ "File content: \n"; ~ hReadBuf; ~ "\n";
+    // Freeing memory
+    result = wincall("HeapFree", 0, hReadBuf);
+} else {
+	// Receive error code, something went wrong...
+    ~ "Can't open the file: "; ~ fileName; ~ ", seems like it doesn't exist\n";
+}
