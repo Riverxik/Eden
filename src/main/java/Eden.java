@@ -90,12 +90,7 @@ public class Eden {
         Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            System.err.println("Error while execute command: " + execCmd);
-            InputStream errStream = process.getErrorStream();
-            while (errStream.available() > 0) {
-                System.err.print(readInputStream(errStream));
-            }
-            errStream.close();
+            System.err.println("Error while execute command: " + execCmd + "\n" + readInputStream(process.getErrorStream()));
         }
         return readInputStream(process.getInputStream());
     }
@@ -118,7 +113,7 @@ public class Eden {
             Process process = Runtime.getRuntime().exec(cmdNasm);
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                printErr("Error while compiling with nasm");
+                printErr("Error while compiling with nasm\n" + readInputStream(process.getErrorStream()));
             }
             System.out.println("[CMD] " + cmdGoLink);
             process = Runtime.getRuntime().exec(cmdGoLink);
