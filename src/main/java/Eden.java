@@ -87,6 +87,7 @@ public class Eden {
     }
 
     private static String run(String execCmd) throws IOException, InterruptedException {
+        System.out.println("[CMD] " + execCmd);
         Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
         int exitCode = process.waitFor();
         if (exitCode != 0) {
@@ -107,20 +108,10 @@ public class Eden {
         try {
             String name = sourceName.split("[.]")[0];
             System.out.printf("[INFO] Compiling %s...\n", sourceName);
-            String cmdNasm = String.format("cmd.exe /c nasm -f win32 %s.asm", name);
-            String cmdGoLink = String.format("cmd.exe /c golink /entry:Start /console kernel32.dll user32.dll %s.obj", name);
-            System.out.println("[CMD] " + cmdNasm);
-            Process process = Runtime.getRuntime().exec(cmdNasm);
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                printErr("Error while compiling with nasm\n" + readInputStream(process.getErrorStream()));
-            }
-            System.out.println("[CMD] " + cmdGoLink);
-            process = Runtime.getRuntime().exec(cmdGoLink);
-            exitCode = process.waitFor();
-            if (exitCode != 0) {
-                printErr("Error while linking with golink");
-            }
+            String cmdNasm = String.format("nasm -f win32 %s.asm", name);
+            String cmdGoLink = String.format("golink /entry:Start /console kernel32.dll user32.dll %s.obj", name);
+            run(cmdNasm);
+            run(cmdGoLink);
             return 0;
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -163,7 +154,6 @@ public class Eden {
         for (String stringConstant : stringConstants) {
             String fullName = "str_" + index++;
             fw.write("\t" + fullName + " db `" + stringConstant.replaceAll("\\\\n", "\\\\r\\\\n") + "`,0\n");
-            //fw.write("\t" + fullName + "Len EQU $-" + fullName + "\n");
         }
     }
 
@@ -696,7 +686,6 @@ public class Eden {
     static void doStateUnar(Token currentToken) {
         if (currentToken.type == TokenType.PLUS) {
             index++;
-            stackState.push(EdenState.DO_OP_UNAR_PLUS);
             stackState.push(EdenState.STARSLASH);
             stackState.push(EdenState.ARG);
             return;
@@ -1047,7 +1036,6 @@ public class Eden {
         DO_WINCALL,
         DO_OP_PLUS,
         DO_OP_MINUS,
-        DO_OP_UNAR_PLUS,
         DO_OP_UNAR_MINUS,
         DO_OP_MULTIPLY,
         DO_OP_DIVIDE,
