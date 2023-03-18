@@ -305,14 +305,19 @@ public class Eden {
             case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
             case INITIALIZATION: doStateInitialization(currentToken); break;
             case TOKEN_SEMICOLON: doTokenSemicolon(currentToken); break;
+            case TOKEN_OPEN_BRACKET: doTokenOpenBracket(currentToken); break;
             case TOKEN_CLOSE_BRACKET: doTokenCloseBracket(currentToken); break;
             case EXPRESSION: doStateExpression(currentToken); break;
+            case WINCALL_NAME: doStateWinCallName(currentToken); break;
+            case EXPRESSION_LIST: doStateExpressionList(); break;
+            case NEXT_EXPRESSION: doStateNextExpression(currentToken); break;
             case LOGICAL: doStateLogical(currentToken); break;
             case ADDITION: doStateAddition(currentToken); break;
             case STARSLASH: doStateStarSlash(currentToken); break;
             case UNAR: doStateUnar(currentToken); break;
             case ARG: doStateArg(currentToken); break;
             case DO_PRINT: doOpPrint(); break;
+            case DO_WINCALL: doOpWinCall(); break;
             case DO_INITIALIZE: doInitialize(); break;
             case DO_OP_PLUS: doOpPlus(); break;
             case DO_OP_MINUS: doOpMinus(); break;
@@ -553,6 +558,14 @@ public class Eden {
         printErrToken(currentToken, "Expression must ends with [;], but found: ");
     }
 
+    static void doTokenOpenBracket(Token currentToken) {
+        if (currentToken.type == TokenType.OPEN_BRACKET) {
+            index++;
+            return;
+        }
+        printErrToken(currentToken, "Expected [(], but found: ");
+    }
+
     static void doTokenCloseBracket(Token currentToken) {
         if (currentToken.type == TokenType.CLOSE_BRACKET) {
             index++;
@@ -570,7 +583,46 @@ public class Eden {
             stackState.push(EdenState.UNAR);
             return;
         }
+        if (cType == TokenType.KEYWORD) {
+            String tValue = String.valueOf(currentToken.value);
+            boolean isWincall = tValue.equalsIgnoreCase("wincall");
+            if (isWincall) {
+                index++;
+                stackState.push(EdenState.DO_WINCALL);
+                stackState.push(EdenState.TOKEN_CLOSE_BRACKET);
+                stackState.push(EdenState.EXPRESSION_LIST);
+                stackState.push(EdenState.WINCALL_NAME);
+                stackState.push(EdenState.TOKEN_OPEN_BRACKET);
+                return;
+            }
+        }
         printErrToken(currentToken, "Expression expects [+,-,NUMBER,(], but found: ");
+    }
+
+    static void doStateWinCallName(Token currentToken) {
+        if (currentToken.type != TokenType.STRING) {
+            printErrToken(currentToken, "Wincall name must be a STRING, but found: ");
+        }
+        index++;
+        Token nextToken = tokenList.get(index);
+        if (nextToken.type == TokenType.COMMA) {
+            index++;
+        } else {
+            printErrToken(nextToken, "After wincall name must be [,], but found: ");
+        }
+        programStack.push(currentToken.value);
+    }
+
+    static void doStateExpressionList() {
+        stackState.push(EdenState.NEXT_EXPRESSION);
+        stackState.push(EdenState.EXPRESSION);
+    }
+
+    static void doStateNextExpression(Token currentToken) {
+        if (currentToken.type == TokenType.COMMA) {
+            index++;
+            stackState.push(EdenState.EXPRESSION_LIST);
+        }
     }
 
     static void doStateLogical(Token currentToken) {
@@ -707,6 +759,17 @@ public class Eden {
             programCode.append("\t;OpPrint\n");
             programCode.append("\tpop eax\n");
             programCode.append("\tcall print\n");
+        }
+    }
+
+    static void doOpWinCall() {
+        if (isInterpreter) {
+            printErr("Does not support wincall for interpreter for now");
+        } else {
+            String nameOfWinCall = String.valueOf(programStack.pop());
+            programCode.append("\t;OpWinCall\n");
+            programCode.append("\tcall ").append(nameOfWinCall).append("\n");
+            programCode.append("\tpush eax\n");
         }
     }
 
@@ -938,6 +1001,10 @@ public class Eden {
         DO_PRINT,
         DO_SKIP,
         EXPRESSION,
+        NEXT_EXPRESSION,
+        EXPRESSION_LIST,
+        WINCALL_NAME,
+        DO_WINCALL,
         DO_OP_PLUS,
         DO_OP_MINUS,
         DO_OP_UNAR_PLUS,
@@ -947,6 +1014,7 @@ public class Eden {
         DO_OP_GREATER,
         DO_OP_LESS,
         DO_OP_EQUALS,
+        TOKEN_OPEN_BRACKET,
         TOKEN_CLOSE_BRACKET,
         TOKEN_SEMICOLON,
         LOGICAL,
@@ -1125,6 +1193,7 @@ public class Eden {
             keywordList.add("while");
             keywordList.add("true");
             keywordList.add("false");
+            keywordList.add("wincall");
         }
 
         void clearComments() {

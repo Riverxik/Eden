@@ -109,7 +109,28 @@ if (expr = 0) {
 ```
 ---
 
-#### Variable definition and assignment
+### WindowsAPI Calls (wincall)
+
+Performs a windows api call
+
+Syntax:
+```
+result = wincall("NameOfWinCall", params...);
+```
+
+Examples:
+
+Get a console handler and print `Hello world!` through `WriteFile` wincall (kernel32.dll). [More info](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-writefile)
+```
+int stdOutHandle;
+int writtnBuf;
+int resultCode;
+stdOutHandle = wincall("_GetStdHandle@4", -11); // Getting the stdOut handler
+resultCode = wincall("_WriteFile@20", 0, writtnBuf, 14, "Hello world!\n", stdOutHandle); // Performs a wincall
+~ resultCode; // Check that wincall was successful. Returns non zero value if it was.
+```
+
+### Variable definition and assignment
 
 Defines a variable with different types and assign value to it.
 
