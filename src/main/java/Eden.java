@@ -18,6 +18,7 @@ public class Eden {
     static Stack<Object> programStack = new Stack<>();
     static List<String> stringConstants = new ArrayList<>();
     static List<EdenVar> edenVarList = new ArrayList<>();
+    static List<String> externWinCallList = new ArrayList<>();
     static StringBuilder programCode = new StringBuilder();
     static EdenType typeToDeclare = EdenType.NONE;
     static int index = 0;
@@ -150,6 +151,9 @@ public class Eden {
     }
 
     static void writeHeader(FileWriter fw) throws IOException {
+        for (String externItem : externWinCallList) {
+            fw.write("extern " + externItem + "\n");
+        }
         fw.write("extern GetStdHandle\n" +
                      "extern WriteFile\n" +
                      "extern ExitProcess\n" +
@@ -609,10 +613,18 @@ public class Eden {
         if (nextToken.type == TokenType.COMMA) {
             index++;
         } else {
-            printErrToken(nextToken, "After wincall name must be [,], but found: ");
+            if (nextToken.type == TokenType.CLOSE_BRACKET) {
+                stackState.pop();
+            } else {
+                printErrToken(nextToken, "After wincall name must be [,], but found: ");
+            }
         }
         stackSizeBeforeWinCallName = programStack.size();
         programStack.push(currentToken.value);
+        String cValue = String.valueOf(currentToken.value);
+        if (!externWinCallList.contains(cValue)) {
+            externWinCallList.add(cValue);
+        }
     }
 
     static void doStateExpressionList() {
