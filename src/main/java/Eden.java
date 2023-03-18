@@ -1009,7 +1009,7 @@ public class Eden {
     }
 
     static void printErr(String errMessage) {
-        System.err.printf("ERROR: %s", errMessage);
+        System.err.printf("ERROR: %s%n", errMessage);
         System.exit(2);
     }
 
