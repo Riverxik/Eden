@@ -109,18 +109,20 @@ public class EdenTest {
         String interpreterOutput = executeCommandAndReturnStringOutput("java -jar Eden.jar -s " + sourceName);
         executeCommandAndReturnStringOutput("java -jar Eden.jar -c -s " + sourceName);
         String compilerOutput = executeCommandAndReturnStringOutput(sourceName.replaceAll("/", "\\\\").split("[.]")[0]+".exe");
+        int errorCode = 0;
         if (!interpreterOutput.equals(expectedOutput)) {
-            System.out.println("[ERROR] Interpreter output is different from expected for: " + sourceName);
+            System.err.println("[ERROR] Interpreter output is different from expected for: " + sourceName);
             System.out.println("--Interpreter--");
             System.out.println(interpreterOutput);
-            System.out.println("--Expected--");
-            System.out.println(expectedOutput);
-            return 1;
+            errorCode = 1;
         }
         if (!compilerOutput.equals(expectedOutput)) {
-            System.out.println("[ERROR] Compiler output is different from expected for: " + sourceName);
+            System.err.println("[ERROR] Compiler output is different from expected for: " + sourceName);
             System.out.println("--Compiler--");
             System.out.println(compilerOutput);
+            errorCode = 1;
+        }
+        if (errorCode != 0) {
             System.out.println("--Expected--");
             System.out.println(expectedOutput);
             return 1;
