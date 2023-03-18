@@ -1,7 +1,4 @@
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -13,6 +10,9 @@ import java.util.*;
  * I just started and i see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
+    private static final long MAX_C_INTEGER = 4294967296L;
+    private static final String HDL_STD_OUT = "4294967285";
+    private static final String HDL_STD_ERR = "4294967284";
     static List<Token> tokenList = new ArrayList<>();
     static Stack<EdenState> stackState = new Stack<>();
     static Stack<Object> programStack = new Stack<>();
@@ -21,6 +21,7 @@ public class Eden {
     static StringBuilder programCode = new StringBuilder();
     static EdenType typeToDeclare = EdenType.NONE;
     static int index = 0;
+    static int stackSizeBeforeWinCallName = 0;
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
 
@@ -610,6 +611,7 @@ public class Eden {
         } else {
             printErrToken(nextToken, "After wincall name must be [,], but found: ");
         }
+        stackSizeBeforeWinCallName = programStack.size();
         programStack.push(currentToken.value);
     }
 
@@ -754,7 +756,7 @@ public class Eden {
                 printErr("Nothing to print");
             }
             String value = String.valueOf(programStack.pop());
-            System.out.printf(value.replaceAll("[\\\\]", "%"));
+            printWithNewLine(value, System.out);
         } else {
             programCode.append("\t;OpPrint\n");
             programCode.append("\tpop eax\n");
@@ -764,13 +766,44 @@ public class Eden {
 
     static void doOpWinCall() {
         if (isInterpreter) {
-            printErr("Does not support wincall for interpreter for now");
+            String nameOfWinCall = String.valueOf(programStack.get(stackSizeBeforeWinCallName));
+            switch (nameOfWinCall) {
+                case "_GetStdHandle@4": {
+                    int handleValue = Integer.parseInt(String.valueOf(programStack.pop()));
+                    programStack.pop();
+                    programStack.push(MAX_C_INTEGER + handleValue);
+                } break;
+                case "_WriteFile@20": {
+                    String handler = String.valueOf(programStack.pop());
+                    String strToPrint = String.valueOf(programStack.pop());
+                    int sizeOfStr = Integer.parseInt(String.valueOf(programStack.pop()));
+                    programStack.pop();
+                    programStack.pop();
+                    programStack.pop();
+                    if (sizeOfStr < strToPrint.length()) { strToPrint = strToPrint.substring(0, sizeOfStr); }
+                    switch (handler) {
+                        case HDL_STD_OUT: printWithNewLine(strToPrint, System.out); break;
+                        case HDL_STD_ERR: printWithNewLine(strToPrint, System.err); break;
+                        default: {
+                            printErr("Unsupported handler: " + handler);
+                        }
+                    }
+                    programStack.push(1);
+                } break;
+                default: {
+                    printErr("Unknown wincall name: " + nameOfWinCall);
+                }
+            }
         } else {
             String nameOfWinCall = String.valueOf(programStack.pop());
             programCode.append("\t;OpWinCall\n");
             programCode.append("\tcall ").append(nameOfWinCall).append("\n");
             programCode.append("\tpush eax\n");
         }
+    }
+
+    static void printWithNewLine(String strToPrint, PrintStream printStream) {
+        printStream.printf(strToPrint.replaceAll("[\\\\]", "%"));
     }
 
     static void doInitialize() {
