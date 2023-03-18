@@ -10,6 +10,12 @@ public class EdenTest {
     public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length == 0) { printHelp(); return; }
         String sourceName = parseArgs(args);
+        if (isRebuild) {
+            System.out.println("[INFO] Compiling latest version of Eden compiler...");
+            executeCommandAndReturnStringOutput("mvn clean compile package");
+            System.out.println("[INFO] Copying jar to project folder...");
+            executeCommandAndReturnStringOutput("copy /Y /B target\\Eden-*.jar /B Eden.jar");
+        }
         if (isCaptureMode) {
             captureTest(sourceName);
         } else if (isFullTesting) {
@@ -72,12 +78,6 @@ public class EdenTest {
     }
 
     private static void captureTest(String sourceName) throws IOException, InterruptedException {
-        if (isRebuild) {
-            System.out.println("[INFO] Compiling latest version of Eden compiler...");
-            executeCommandAndReturnStringOutput("mvn clean compile package");
-            System.out.println("[INFO] Copying jar to project folder...");
-            executeCommandAndReturnStringOutput("copy /Y /B target\\Eden-*.jar /B Eden.jar");
-        }
         String cmdInterpreter = String.format("java -jar Eden.jar -s %s", sourceName);
         System.out.println("[INFO] Executing interpreter with: " + sourceName);
         System.out.println("[CMD] " + cmdInterpreter);
