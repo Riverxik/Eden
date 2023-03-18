@@ -1063,7 +1063,14 @@ public class Eden {
         EdenVar(EdenType type) {
             this.type = type;
             this.identifier = "";
-            this.value = null;
+            switch (type) {
+                default:
+                case STRING:
+                case NONE: this.value = null;
+                case CHAR:
+                case BOOL:
+                case INT: this.value = 0;
+            }
         }
     }
 
