@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -301,7 +303,9 @@ public class Eden {
             case WINCALL_NAME: doStateWinCallName(currentToken); break;
             case EXPRESSION_LIST: doStateExpressionList(); break;
             case NEXT_EXPRESSION: doStateNextExpression(currentToken); break;
+            case BITWISE: doStateBitwise(currentToken); break;
             case LOGICAL: doStateLogical(currentToken); break;
+            case SHIFT: doStateShift(currentToken); break;
             case ADDITION: doStateAddition(currentToken); break;
             case STARSLASH: doStateStarSlash(currentToken); break;
             case UNAR: doStateUnar(currentToken); break;
@@ -317,6 +321,10 @@ public class Eden {
             case DO_OP_EQUALS: doOpEquals(); break;
             case DO_OP_GREATER: doOpGreater(); break;
             case DO_OP_LESS: doOpLess(); break;
+            case DO_OP_L_SHIFT: doOpLeftShift(); break;
+            case DO_OP_R_SHIFT: doOpRightShift(); break;
+            case DO_OP_BAND: doOpBitAnd(); break;
+            case DO_OP_BOR: doOpBitOr(); break;
             case DO_SKIP: doStateSkip(currentToken); break;
             default: {
                 System.err.printf("ERROR: Unknown State: %s with Token: %s", state, currentToken);
@@ -568,7 +576,9 @@ public class Eden {
         TokenType cType = currentToken.type;
         if (cType == TokenType.PLUS || cType == TokenType.MINUS || cType == TokenType.OPEN_BRACKET
                 || cType == TokenType.NUMBER || cType == TokenType.STRING || cType == TokenType.SYMBOL) {
+            stackState.push(EdenState.BITWISE);
             stackState.push(EdenState.LOGICAL);
+            stackState.push(EdenState.SHIFT);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
             return;
@@ -624,11 +634,33 @@ public class Eden {
         }
     }
 
+    static void doStateBitwise(Token currentToken) {
+        TokenType cType = currentToken.type;
+        if (cType == TokenType.B_AND) {
+            index++;
+            stackState.push(EdenState.DO_OP_BAND);
+            stackState.push(EdenState.LOGICAL);
+            stackState.push(EdenState.SHIFT);
+            stackState.push(EdenState.ADDITION);
+            stackState.push(EdenState.UNAR);
+            return;
+        }
+        if (cType == TokenType.B_OR) {
+            index++;
+            stackState.push(EdenState.DO_OP_BOR);
+            stackState.push(EdenState.LOGICAL);
+            stackState.push(EdenState.SHIFT);
+            stackState.push(EdenState.ADDITION);
+            stackState.push(EdenState.UNAR);
+        }
+    }
+
     static void doStateLogical(Token currentToken) {
         TokenType cType = currentToken.type;
         if (cType == TokenType.GREATER) {
             index++;
             stackState.push(EdenState.DO_OP_GREATER);
+            stackState.push(EdenState.SHIFT);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
             return;
@@ -636,6 +668,7 @@ public class Eden {
         if (cType == TokenType.LESS) {
             index++;
             stackState.push(EdenState.DO_OP_LESS);
+            stackState.push(EdenState.SHIFT);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
             return;
@@ -643,6 +676,24 @@ public class Eden {
         if (cType == TokenType.EQUALS) {
             index++;
             stackState.push(EdenState.DO_OP_EQUALS);
+            stackState.push(EdenState.SHIFT);
+            stackState.push(EdenState.ADDITION);
+            stackState.push(EdenState.UNAR);
+        }
+    }
+
+    static void doStateShift(Token currentToken) {
+        TokenType cType = currentToken.type;
+        if (cType == TokenType.L_SHIFT) {
+            index++;
+            stackState.push(EdenState.DO_OP_L_SHIFT);
+            stackState.push(EdenState.ADDITION);
+            stackState.push(EdenState.UNAR);
+            return;
+        }
+        if (cType == TokenType.R_SHIFT) {
+            index++;
+            stackState.push(EdenState.DO_OP_R_SHIFT);
             stackState.push(EdenState.ADDITION);
             stackState.push(EdenState.UNAR);
         }
@@ -971,6 +1022,78 @@ public class Eden {
         }
     }
 
+    static void doOpLeftShift() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Left shift operation expected two operands, but found less");
+            }
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first << second;
+            programStack.push(result);
+        } else {
+            programCode.append("\t;OpLeftShift\n");
+            programCode.append("\tpop ecx\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tshl ebx, cl\n");
+            programCode.append("\tpush ebx\n");
+        }
+    }
+
+    static void doOpRightShift() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Right shift operation expected two operands, but found less");
+            }
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first >> second;
+            programStack.push(result);
+        } else {
+            programCode.append("\t;OpRightShift\n");
+            programCode.append("\tpop ecx\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tshr ebx, cl\n");
+            programCode.append("\tpush ebx\n");
+        }
+    }
+
+    static void doOpBitAnd() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Bitwise and operation expected two operands, but found less");
+            }
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first & second;
+            programStack.push(result);
+        } else {
+            programCode.append("\t;OpBitAnd\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tand eax, ebx\n");
+            programCode.append("\tpush eax\n");
+        }
+    }
+
+    static void doOpBitOr() {
+        if (isInterpreter) {
+            if (programStack.size() < 2) {
+                printErr("Bitwise or operation expected two operands, but found less");
+            }
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first | second;
+            programStack.push(result);
+        } else {
+            programCode.append("\t;OpBitOr\n");
+            programCode.append("\tpop eax\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tor eax, ebx\n");
+            programCode.append("\tpush eax\n");
+        }
+    }
+
     static String getIdentifier(Token currentToken) {
         if (currentToken.type != TokenType.SYMBOL) {
             printErrToken(currentToken, "Identifier must be type of SYMBOL, but found: ");
@@ -1034,6 +1157,10 @@ public class Eden {
         EXPRESSION_LIST,
         WINCALL_NAME,
         DO_WINCALL,
+        DO_OP_BAND,
+        DO_OP_BOR,
+        DO_OP_L_SHIFT,
+        DO_OP_R_SHIFT,
         DO_OP_PLUS,
         DO_OP_MINUS,
         DO_OP_UNAR_MINUS,
@@ -1045,7 +1172,9 @@ public class Eden {
         TOKEN_OPEN_BRACKET,
         TOKEN_CLOSE_BRACKET,
         TOKEN_SEMICOLON,
+        BITWISE,
         LOGICAL,
+        SHIFT,
         ADDITION,
         STARSLASH,
         UNAR,
@@ -1076,6 +1205,10 @@ public class Eden {
         GREATER,
         LESS,
         EQUALS,
+        L_SHIFT,
+        R_SHIFT,
+        B_AND,
+        B_OR,
         NUMBER,
         STRING,
         SYMBOL,
@@ -1136,7 +1269,7 @@ public class Eden {
     }
 
     static class Lexer {
-        String allowedCharacters = "~+-*/;()=><!{}().,'\"";
+        String allowedCharacters = "~+-*/;()=><!{}().,'\"|&";
         String source;
         List<Token> tokenList;
         List<String> keywordList;
@@ -1368,11 +1501,35 @@ public class Eden {
                     break;
                 }
                 case '>': {
-                    tokenList.add(new Token(TokenType.GREATER, currentChar, new Location(line, column)));
+                    int cIndex = currentCharIndex;
+                    next();
+                    if (currentChar == '>') {
+                        tokenList.add(new Token(TokenType.R_SHIFT, ">>", new Location(line, column - 1)));
+                    } else {
+                        currentCharIndex = cIndex;
+                        column--;
+                        tokenList.add(new Token(TokenType.GREATER, currentChar, new Location(line, column)));
+                    }
                     break;
                 }
                 case '<': {
-                    tokenList.add(new Token(TokenType.LESS, currentChar, new Location(line, column)));
+                    int cIndex = currentCharIndex;
+                    next();
+                    if (currentChar == '<') {
+                        tokenList.add(new Token(TokenType.L_SHIFT, "<<", new Location(line, column - 1)));
+                    } else {
+                        currentCharIndex = cIndex;
+                        column--;
+                        tokenList.add(new Token(TokenType.LESS, currentChar, new Location(line, column)));
+                    }
+                    break;
+                }
+                case '|': {
+                    tokenList.add(new Token(TokenType.B_OR, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '&': {
+                    tokenList.add(new Token(TokenType.B_AND, currentChar, new Location(line, column)));
                     break;
                 }
                 case '=': {
