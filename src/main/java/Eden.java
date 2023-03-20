@@ -12,9 +12,9 @@ import java.util.*;
  * I just started and i see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
-    private static final long MAX_C_INTEGER = 4294967296L;
-    private static final String HDL_STD_OUT = "4294967285";
-    private static final String HDL_STD_ERR = "4294967284";
+    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
+    private static final String HDL_STD_OUT = "2147483636";
+    private static final String HDL_STD_ERR = "2147483635";
     static List<Token> tokenList = new ArrayList<>();
     static Stack<EdenState> stackState = new Stack<>();
     static Stack<Object> programStack = new Stack<>();
