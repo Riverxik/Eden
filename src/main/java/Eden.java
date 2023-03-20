@@ -1,5 +1,3 @@
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -296,6 +294,7 @@ public class Eden {
             case IDENTIFIER: doStateIdentifier(currentToken); break;
             case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
             case INITIALIZATION: doStateInitialization(currentToken); break;
+            case CALC_SHIFT: doStateCalcShift(); break;
             case TOKEN_SEMICOLON: doTokenSemicolon(currentToken); break;
             case TOKEN_OPEN_BRACKET: doTokenOpenBracket(currentToken); break;
             case TOKEN_CLOSE_BRACKET: doTokenCloseBracket(currentToken); break;
@@ -303,6 +302,7 @@ public class Eden {
             case WINCALL_NAME: doStateWinCallName(currentToken); break;
             case EXPRESSION_LIST: doStateExpressionList(); break;
             case NEXT_EXPRESSION: doStateNextExpression(currentToken); break;
+            case INDEX: doStateIndex(currentToken); break;
             case BITWISE: doStateBitwise(currentToken); break;
             case LOGICAL: doStateLogical(currentToken); break;
             case SHIFT: doStateShift(currentToken); break;
@@ -312,6 +312,7 @@ public class Eden {
             case ARG: doStateArg(currentToken); break;
             case DO_PRINT: doOpPrint(); break;
             case DO_WINCALL: doOpWinCall(); break;
+            case DO_OP_INDEX: doOpIndex(currentToken); break;
             case DO_INITIALIZE: doInitialize(); break;
             case DO_OP_PLUS: doOpPlus(); break;
             case DO_OP_MINUS: doOpMinus(); break;
@@ -371,6 +372,12 @@ public class Eden {
         index++;
         stackState.push(EdenState.TOKEN_SEMICOLON);
         stackState.push(EdenState.INITIALIZATION);
+        if (tokenList.get(index).type == TokenType.OPEN_SQUARE_BRACKET) {
+            index++;
+            programStack.push(edenVarList.indexOf(var));
+            stackState.push(EdenState.CALC_SHIFT);
+            stackState.push(EdenState.EXPRESSION);
+        }
     }
 
     static void doStateVarDeclaration(Token currentToken) {
@@ -548,6 +555,13 @@ public class Eden {
         }
     }
 
+    static void doStateCalcShift() {
+        index++;
+        int shift = Integer.parseInt(String.valueOf(programStack.pop()));
+        int index = Integer.parseInt(String.valueOf(programStack.pop()));
+        edenVarList.get(index).shift = shift;
+    }
+
     static void doTokenSemicolon(Token currentToken) {
         if (currentToken.type == TokenType.SEMICOLON) {
             index++;
@@ -580,6 +594,7 @@ public class Eden {
             stackState.push(EdenState.LOGICAL);
             stackState.push(EdenState.SHIFT);
             stackState.push(EdenState.ADDITION);
+            stackState.push(EdenState.INDEX);
             stackState.push(EdenState.UNAR);
             return;
         }
@@ -631,6 +646,14 @@ public class Eden {
         if (currentToken.type == TokenType.COMMA) {
             index++;
             stackState.push(EdenState.EXPRESSION_LIST);
+        }
+    }
+
+    static void doStateIndex(Token currentToken) {
+        if (currentToken.type == TokenType.OPEN_SQUARE_BRACKET) {
+            index++;
+            stackState.push(EdenState.DO_OP_INDEX);
+            stackState.push(EdenState.EXPRESSION);
         }
     }
 
@@ -853,6 +876,15 @@ public class Eden {
         printStream.printf(strToPrint.replaceAll("[\\\\]", "%"));
     }
 
+    static void doOpIndex(Token currentToken) {
+        if (currentToken.type == TokenType.CLOSE_SQUARE_BRACKET) {
+            index++;
+            int indexInValue = Integer.parseInt(String.valueOf(programStack.pop()));
+            String strValue = String.valueOf(programStack.pop());
+            programStack.push(String.valueOf(strValue.charAt(indexInValue)));
+        }
+    }
+
     static void doInitialize() {
         if (isInterpreter) {
             if (programStack.size() < 2) {
@@ -861,7 +893,30 @@ public class Eden {
             Object value = programStack.pop();
             String identifier = String.valueOf(programStack.pop());
             EdenVar var = getEdenVarByIdentifier(identifier);
-            var.value = value;
+            switch (var.type) {
+                default:
+                case NONE:
+                case BOOL:
+                case CHAR:
+                case INT: {
+                    try {
+                        var.value = Integer.parseInt(String.valueOf(value));
+                    } catch (NumberFormatException ignored) {
+                        var.value = (int)String.valueOf(value).charAt(0);
+                    }
+                    break;
+                }
+                case STRING: {
+                    if (var.shift == -1) {
+                        var.value = value;
+                    } else {
+                        char[] origValue = String.valueOf(var.value).toCharArray();
+                        origValue[var.shift] = String.valueOf(value).charAt(0);
+                        var.value = String.valueOf(origValue);
+                    }
+                    break;
+                }
+            }
         } else {
             String identifier = String.valueOf(programStack.pop());
             programCode.append("\t;OpInitialize\n");
@@ -1139,6 +1194,7 @@ public class Eden {
         VAR_DECLARATION,
         IDENTIFIER,
         INITIALIZATION,
+        CALC_SHIFT,
         NEXT_IDENTIFIER,
         PRINT_STATEMENT,
         WHILE_STATEMENT,
@@ -1157,6 +1213,7 @@ public class Eden {
         EXPRESSION_LIST,
         WINCALL_NAME,
         DO_WINCALL,
+        DO_OP_INDEX,
         DO_OP_BAND,
         DO_OP_BOR,
         DO_OP_L_SHIFT,
@@ -1172,6 +1229,7 @@ public class Eden {
         TOKEN_OPEN_BRACKET,
         TOKEN_CLOSE_BRACKET,
         TOKEN_SEMICOLON,
+        INDEX,
         BITWISE,
         LOGICAL,
         SHIFT,
@@ -1197,6 +1255,8 @@ public class Eden {
         CLOSE_BRACKET,
         OPEN_CURLY_BRACKET,
         CLOSE_CURLY_BRACKET,
+        OPEN_SQUARE_BRACKET,
+        CLOSE_SQUARE_BRACKET,
         PRINT_STATEMENT,
         PLUS,
         MINUS,
@@ -1220,10 +1280,12 @@ public class Eden {
         EdenType type;
         String identifier;
         Object value;
+        int shift;
 
         EdenVar(EdenType type) {
             this.type = type;
             this.identifier = "";
+            this.shift = -1;
             switch (type) {
                 default:
                 case STRING:
@@ -1269,7 +1331,7 @@ public class Eden {
     }
 
     static class Lexer {
-        String allowedCharacters = "~+-*/;()=><!{}().,'\"|&";
+        String allowedCharacters = "~+-*/;()=><!{}().,'\"|&[]";
         String source;
         List<Token> tokenList;
         List<String> keywordList;
@@ -1478,6 +1540,14 @@ public class Eden {
                 }
                 case '}': {
                     tokenList.add(new Token(TokenType.CLOSE_CURLY_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '[': {
+                    tokenList.add(new Token(TokenType.OPEN_SQUARE_BRACKET, currentChar, new Location(line, column)));
+                    break;
+                }
+                case ']': {
+                    tokenList.add(new Token(TokenType.CLOSE_SQUARE_BRACKET, currentChar, new Location(line, column)));
                     break;
                 }
                 case '~': {
