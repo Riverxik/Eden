@@ -557,9 +557,21 @@ public class Eden {
 
     static void doStateCalcShift() {
         index++;
-        int shift = Integer.parseInt(String.valueOf(programStack.pop()));
-        int index = Integer.parseInt(String.valueOf(programStack.pop()));
-        edenVarList.get(index).shift = shift;
+        if (isInterpreter) {
+            int shift = Integer.parseInt(String.valueOf(programStack.pop()));
+            int index = Integer.parseInt(String.valueOf(programStack.pop()));
+            edenVarList.get(index).shift = shift;
+        } else {
+            // TODO: 0 everytime, and plus to eden_a
+            int index = Integer.parseInt(String.valueOf(programStack.pop()));
+            String identifier = edenVarList.get(index).identifier;
+            edenVarList.get(index).shift = 0;
+            programCode.append("\t;DoCalcShift\n");
+            programCode.append("\tmov eax, [").append(identifier).append("]\n");
+            programCode.append("\tpop ebx\n");
+            programCode.append("\tadd eax, ebx\n");
+            programCode.append("\tpush eax\n");
+        }
     }
 
     static void doTokenSemicolon(Token currentToken) {
@@ -879,9 +891,17 @@ public class Eden {
     static void doOpIndex(Token currentToken) {
         if (currentToken.type == TokenType.CLOSE_SQUARE_BRACKET) {
             index++;
-            int indexInValue = Integer.parseInt(String.valueOf(programStack.pop()));
-            String strValue = String.valueOf(programStack.pop());
-            programStack.push(String.valueOf(strValue.charAt(indexInValue)));
+            if (isInterpreter) {
+                int indexInValue = Integer.parseInt(String.valueOf(programStack.pop()));
+                String strValue = String.valueOf(programStack.pop());
+                programStack.push(String.valueOf(strValue.charAt(indexInValue)));
+            } else {
+                programCode.append("\t;DoOpIndex\n");
+                programCode.append("\tpop ebx\n");
+                programCode.append("\tpop eax\n");
+                programCode.append("\tadd eax, ebx\n");
+                programCode.append("\tpush eax\n");
+            }
         }
     }
 
@@ -919,9 +939,16 @@ public class Eden {
             }
         } else {
             String identifier = String.valueOf(programStack.pop());
+            EdenVar var = getEdenVarByIdentifier(identifier);
             programCode.append("\t;OpInitialize\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tmov [").append(identifier).append("], eax\n");
+            programCode.append("\tpop ebx\n");
+            if (var.shift == -1) {
+                programCode.append("\tmov [").append(identifier).append("], ebx\n");
+            } else {
+                programCode.append("\tpop eax\n");
+                programCode.append("\tmov ecx, [ebx]\n");
+                programCode.append("\tmov [eax], ecx\n");
+            }
         }
     }
 
