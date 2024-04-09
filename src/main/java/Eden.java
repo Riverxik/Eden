@@ -10,23 +10,17 @@ import java.util.*;
  * I just started and i see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
-    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
-    private static final String HDL_STD_OUT = "2147483636";
-    private static final String HDL_STD_ERR = "2147483635";
+//    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
+//    private static final String HDL_STD_OUT = "2147483636";
+//    private static final String HDL_STD_ERR = "2147483635";
     static List<Token> tokenList = new ArrayList<>();
-    static Stack<EdenState> stackState = new Stack<>();
-    static Stack<Object> programStack = new Stack<>();
     static List<String> stringConstants = new ArrayList<>();
-    static List<EdenVar> edenVarList = new ArrayList<>();
     static List<String> externWinCallList = new ArrayList<>();
     static StringBuilder programCode = new StringBuilder();
-    static EdenType typeToDeclare = EdenType.NONE;
-    static int index = 0;
-    static int stackSizeBeforeWinCallName = 0;
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws IOException {
         // Args
         if (args.length == 0) {
             System.out.println("Usage: eden -s scrName.eden");
@@ -64,36 +58,22 @@ public class Eden {
         lexer.tokenize();
         lexer.clearComments();
 
-        lexer.crossReference();
+        lexer.tokenList.forEach(System.out::println);
 
         // Parsing.
-        stackState.push(EdenState.PROGRAM);
-        Token currentToken = tokenList.get(index);
-        while (currentToken.type != TokenType.END || stackState.peek() != EdenState.PROGRAM) {
-            choseRule(currentToken);
-            currentToken = tokenList.get(index);
-        }
-        if (programStack.size() > 0) {
-            printErr("Program stack must be empty by this point, something went wrong");
-        }
-        if (!isInterpreter) {
-            // Compilation
-            writeFile(sourceName);
-            int isSuccess = compile(sourceName);
-            if (isSuccess == 0 && isRunAfterCompilation) {
-                System.out.println(run(sourceName.split("[.]")[0]+".exe"));
-            }
-        }
+        // Analysis.
+        // Optimising.
+        // IR
+        // Interpret || CodeGen
     }
 
-    private static String run(String execCmd) throws IOException, InterruptedException {
+    private static void run(String execCmd) throws IOException, InterruptedException {
         System.out.println("[CMD] " + execCmd);
         Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             System.err.println("Error while execute command: " + execCmd + "\n" + readInputStream(process.getErrorStream()));
         }
-        return readInputStream(process.getInputStream());
     }
 
     private static String readInputStream(InputStream inputStream) throws IOException {
@@ -104,7 +84,8 @@ public class Eden {
         return sb.toString();
     }
 
-    static int compile(String sourceName) {
+    @Deprecated
+    static int compileToExe(String sourceName) {
         try {
             String name = sourceName.split("[.]")[0];
             System.out.printf("[INFO] Compiling %s...\n", sourceName);
@@ -119,13 +100,14 @@ public class Eden {
         }
     }
 
-    static void writeFile(String sourceName) {
+    @Deprecated
+    static void writeAsmFile(String sourceName) {
         try {
             File output = new File(sourceName.split("[.]")[0]+".asm");
             FileWriter fw = new FileWriter(output);
             writeHeader(fw);
             writeData(fw);
-            writeVariables(fw);
+//            writeVariables(fw);
             writeText(fw);
             fw.write(programCode.toString());
             fw.write("\tcall exit\n");
@@ -157,31 +139,31 @@ public class Eden {
         }
     }
 
-    static void writeVariables(FileWriter fw) throws IOException {
-        fw.write("section .bss\n");
-        fw.write("\tStdHandle resd 1\n");
-        fw.write("\tdigitBuffer resb 100\n");
-        fw.write("\tdigitBufferPos resb 8\n");
-        for (EdenVar var : edenVarList) {
-            switch (var.type) {
-                case STRING:
-                case INT: {
-                    fw.write("\t" + var.identifier + " resb 4\n");
-                    break;
-                }
-                case BOOL: {
-                    fw.write("\t" + var.identifier + " resb 1\n");
-                    break;
-                }
-                case CHAR: {
-                    fw.write("\t" + var.identifier + " resb 2\n");
-                    break;
-                }
-                case NONE:
-                default: fw.write("\t; There is some problem with var declaration in compiler, probably\n");
-            }
-        }
-    }
+//    static void writeVariables(FileWriter fw) throws IOException {
+//        fw.write("section .bss\n");
+//        fw.write("\tStdHandle resd 1\n");
+//        fw.write("\tdigitBuffer resb 100\n");
+//        fw.write("\tdigitBufferPos resb 8\n");
+//        for (EdenVar var : edenVarList) {
+//            switch (var.type) {
+//                case STRING:
+//                case INT: {
+//                    fw.write("\t" + var.identifier + " resb 4\n");
+//                    break;
+//                }
+//                case BOOL: {
+//                    fw.write("\t" + var.identifier + " resb 1\n");
+//                    break;
+//                }
+//                case CHAR: {
+//                    fw.write("\t" + var.identifier + " resb 2\n");
+//                    break;
+//                }
+//                case NONE:
+//                default: fw.write("\t; There is some problem with var declaration in compiler, probably\n");
+//            }
+//        }
+//    }
 
     static void writeText(FileWriter fw) throws IOException {
         fw.write("section .text\n");
@@ -275,933 +257,48 @@ public class Eden {
         fw.write("\tmov dword [StdHandle], eax\n");
     }
 
-    static void choseRule(Token currentToken) {
-        EdenState state = stackState.pop();
-        switch (state) {
-            case PROGRAM: doStateProgram(); break;
-            case STATEMENT: doStateStatement(currentToken); break;
-            case VAR_INITIALIZATION: doStateVarInitialization(currentToken); break;
-            case VAR_DECLARATION: doStateVarDeclaration(currentToken); break;
-            case PRINT_STATEMENT: doStatePrintStatement(); break;
-            case WHILE_STATEMENT: doStateWhileStatement(); break;
-            case WHILE_COND_STATEMENT: doStateWhileConditionStatement(currentToken); break;
-            case END_WHILE: doStateEndWhile(currentToken); break;
-            case IF_STATEMENT: doStateIfStatement(); break;
-            case IF_COND_STATEMENT: doStateIfConditionStatement(currentToken); break;
-            case BLOCK_STATEMENT: doStateBlockStatement(currentToken); break;
-            case ELSE_STATEMENT: doStateEndIfElseStatement(currentToken); break;
-            case NEXT_STATEMENT: doStateNextStatement(currentToken); break;
-            case IDENTIFIER: doStateIdentifier(currentToken); break;
-            case NEXT_IDENTIFIER: doStateNextIdentifier(currentToken); break;
-            case INITIALIZATION: doStateInitialization(currentToken); break;
-            case CALC_SHIFT: doStateCalcShift(); break;
-            case TOKEN_SEMICOLON: doTokenSemicolon(currentToken); break;
-            case TOKEN_OPEN_BRACKET: doTokenOpenBracket(currentToken); break;
-            case TOKEN_CLOSE_BRACKET: doTokenCloseBracket(currentToken); break;
-            case EXPRESSION: doStateExpression(currentToken); break;
-            case WINCALL_NAME: doStateWinCallName(currentToken); break;
-            case EXPRESSION_LIST: doStateExpressionList(); break;
-            case NEXT_EXPRESSION: doStateNextExpression(currentToken); break;
-            case INDEX: doStateIndex(currentToken); break;
-            case BITWISE: doStateBitwise(currentToken); break;
-            case LOGICAL: doStateLogical(currentToken); break;
-            case SHIFT: doStateShift(currentToken); break;
-            case ADDITION: doStateAddition(currentToken); break;
-            case STARSLASH: doStateStarSlash(currentToken); break;
-            case UNAR: doStateUnar(currentToken); break;
-            case ARG: doStateArg(currentToken); break;
-            case DO_PRINT: doOpPrint(); break;
-            case DO_WINCALL: doOpWinCall(); break;
-            case DO_OP_INDEX: doOpIndex(currentToken); break;
-            case DO_INITIALIZE: doInitialize(); break;
-            case DO_OP_PLUS: doOpPlus(); break;
-            case DO_OP_MINUS: doOpMinus(); break;
-            case DO_OP_MULTIPLY: doOpMultiply(); break;
-            case DO_OP_DIVIDE: doOpDivide(); break;
-            case DO_OP_UNAR_MINUS: doOpUnarMinus(); break;
-            case DO_OP_EQUALS: doOpEquals(); break;
-            case DO_OP_GREATER: doOpGreater(); break;
-            case DO_OP_LESS: doOpLess(); break;
-            case DO_OP_L_SHIFT: doOpLeftShift(); break;
-            case DO_OP_R_SHIFT: doOpRightShift(); break;
-            case DO_OP_BAND: doOpBitAnd(); break;
-            case DO_OP_BOR: doOpBitOr(); break;
-            case DO_SKIP: doStateSkip(currentToken); break;
-            default: {
-                System.err.printf("ERROR: Unknown State: %s with Token: %s", state, currentToken);
-                System.exit(-1);
-            }
-        }
-    }
-
-    static void doStateProgram() {
-        stackState.push(EdenState.PROGRAM);
-        stackState.push(EdenState.STATEMENT);
-    }
-
-    static void doStateStatement(Token currentToken) {
-        if (currentToken.type == TokenType.PRINT_STATEMENT) {
-            stackState.push(EdenState.PRINT_STATEMENT);
-            return;
-        }
-        if (currentToken.type == TokenType.KEYWORD) {
-            String tValue = String.valueOf(currentToken.value);
-            if (tValue.equalsIgnoreCase("while")) {
-                stackState.push(EdenState.WHILE_STATEMENT);
-            } else if (tValue.equalsIgnoreCase("if")) {
-                stackState.push(EdenState.IF_STATEMENT);
-            } else if (tValue.equalsIgnoreCase("int") || tValue.equalsIgnoreCase("bool")
-                    || tValue.equalsIgnoreCase("string") || tValue.equalsIgnoreCase("char")){
-                stackState.push(EdenState.VAR_DECLARATION);
-            } else {
-                printErrToken(currentToken, "Unknown keyword: ");
-            }
-            return;
-        }
-        if (currentToken.type == TokenType.SYMBOL) {
-            stackState.push(EdenState.VAR_INITIALIZATION);
-            return;
-        }
-        printErrToken(currentToken, "Statement can't start with: ");
-    }
-
-    static void doStateVarInitialization(Token currentToken) {
-        String identifier = getIdentifier(currentToken);
-        EdenVar var = getEdenVarByIdentifier(identifier);
-        programStack.push(var.identifier);
-        index++;
-        stackState.push(EdenState.TOKEN_SEMICOLON);
-        stackState.push(EdenState.INITIALIZATION);
-        if (tokenList.get(index).type == TokenType.OPEN_SQUARE_BRACKET) {
-            index++;
-            programStack.push(edenVarList.indexOf(var));
-            stackState.push(EdenState.CALC_SHIFT);
-            stackState.push(EdenState.EXPRESSION);
-        }
-    }
-
-    static void doStateVarDeclaration(Token currentToken) {
-        try {
-            typeToDeclare = EdenType.valueOf(String.valueOf(currentToken.value).toUpperCase());
-        } catch (IllegalArgumentException ignored) {
-            printErrToken(currentToken, "Unknown Eden_Type keyword: ");
-        }
-        index++;
-        edenVarList.add(new EdenVar(typeToDeclare));
-        stackState.push(EdenState.TOKEN_SEMICOLON);
-        stackState.push(EdenState.IDENTIFIER);
-    }
-
-    static void doStatePrintStatement() {
-        index++;
-        stackState.push(EdenState.DO_PRINT);
-        stackState.push(EdenState.TOKEN_SEMICOLON);
-        stackState.push(EdenState.EXPRESSION);
-    }
-
-    static void doStateWhileStatement() {
-        if (!isInterpreter) {
-            programCode.append("\t; OpWhile\n");
-            programCode.append("addr_").append(index).append(":\n");
-        }
-        index++;
-        stackState.push(EdenState.WHILE_COND_STATEMENT);
-        stackState.push(EdenState.EXPRESSION);
-    }
-
-    static void doStateIfStatement() {
-        index++;
-        stackState.push(EdenState.ELSE_STATEMENT);
-        stackState.push(EdenState.IF_COND_STATEMENT);
-        stackState.push(EdenState.EXPRESSION);
-    }
-
-    static void doStateEndWhile(Token currentToken) {
-        if (isInterpreter) {
-            index = currentToken.linkIp; // goto while
-            stackState.push(EdenState.WHILE_STATEMENT);
-        } else {
-            int linkIp = currentToken.linkIp;
-            if (linkIp == 0) {
-                printErrToken(currentToken, "while block instruction does not have a reference to the start of its block. Please call lexer.crossReference() before trying to compile it");
-            }
-            programCode.append("\t; OpEndWhile\n");
-            programCode.append("\tjmp addr_").append(linkIp).append("\n");
-            programCode.append("addr_").append(++index).append(":\n");
-        }
-    }
-
-    static void doStateEndIfElseStatement(Token currentToken) {
-        if (currentToken.type == TokenType.CLOSE_CURLY_BRACKET) {
-            index++;
-        }
-        if (isInterpreter) {
-            currentToken = tokenList.get(index);
-            if (currentToken.type == TokenType.KEYWORD) {
-                String tValue = String.valueOf(currentToken.value);
-                if (tValue.equalsIgnoreCase("else")) {
-                    index = tokenList.get(index).linkIp;
-                }
-            }
-        } else {
-            Token nextToken = tokenList.get(index);
-            if (String.valueOf(nextToken.value).equalsIgnoreCase("else")) {
-                if (nextToken.linkIp == 0) {
-                    printErrToken(nextToken, "else block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
-                }
-                programCode.append("\t; Else\n");
-                programCode.append("\tjmp addr_").append(nextToken.linkIp - 1).append("\n");
-                programCode.append("addr_").append(currentToken.index + 2).append(":\n");
-                index++;
-                stackState.push(EdenState.ELSE_STATEMENT);
-                stackState.push(EdenState.BLOCK_STATEMENT);
-            } else {
-                programCode.append("\t; End if\n");
-                programCode.append("addr_").append(currentToken.index).append(":\n");
-            }
-        }
-    }
-
-    static void doStateWhileConditionStatement(Token currentToken) {
-        if (isInterpreter) {
-            if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
-                int linkIp = currentToken.linkIp;
-                if (linkIp == 0) {
-                    printErrToken(currentToken, "while block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to interpret it");
-                }
-                index = currentToken.linkIp;
-            } else {
-                stackState.push(EdenState.END_WHILE);
-                stackState.push(EdenState.BLOCK_STATEMENT);
-            }
-        } else {
-            int linkIp = currentToken.linkIp;
-            if (linkIp == 0) {
-                printErrToken(currentToken, "while block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
-            }
-            programCode.append("\t; OpJumpWhile\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\ttest eax, eax\n");
-            programCode.append("\tjz addr_").append(linkIp).append("\n");
-            stackState.push(EdenState.END_WHILE);
-            stackState.push(EdenState.BLOCK_STATEMENT);
-        }
-    }
-
-    static void doStateIfConditionStatement(Token currentToken) {
-        if (isInterpreter) {
-            if (Integer.parseInt(String.valueOf(programStack.pop())) == 0) {
-                int linkIp = currentToken.linkIp;
-                if (linkIp == 0) {
-                    printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to interpret it");
-                }
-                index = currentToken.linkIp;
-            }
-        } else {
-            int linkIp = currentToken.linkIp;
-            if (linkIp == 0) {
-                printErrToken(currentToken, "if block instruction does not have a reference to the end of its block. Please call lexer.crossReference() before trying to compile it");
-            }
-            programCode.append("\t; OpIf\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\ttest eax, eax\n");
-            programCode.append("\tjz addr_").append(linkIp).append("\n");
-        }
-        if (tokenList.get(index).type == TokenType.OPEN_CURLY_BRACKET) {
-            stackState.push(EdenState.BLOCK_STATEMENT);
-        }
-    }
-
-    static void doStateBlockStatement(Token currentToken) {
-        if (currentToken.type == TokenType.OPEN_CURLY_BRACKET) {
-            index++;
-            stackState.push(EdenState.NEXT_STATEMENT);
-            stackState.push(EdenState.STATEMENT);
-        } else {
-            printErrToken(currentToken, "Block of statements must start with [{], but found: ");
-        }
-    }
-
-    static void doStateNextStatement(Token currentToken) {
-        // There is might be a bug
-        if (currentToken.type != TokenType.CLOSE_CURLY_BRACKET) {
-            stackState.push(EdenState.NEXT_STATEMENT);
-            stackState.push(EdenState.STATEMENT);
-        }
-    }
-
-    static void doStateIdentifier(Token currentToken) {
-        declareVar(currentToken);
-        index++;
-        stackState.push(EdenState.NEXT_IDENTIFIER);
-        stackState.push(EdenState.INITIALIZATION);
-    }
-
-    static void doStateNextIdentifier(Token currentToken) {
-        if (currentToken.type == TokenType.COMMA) {
-            index++;
-            edenVarList.add(new EdenVar(typeToDeclare));
-            stackState.push(EdenState.IDENTIFIER);
-        }
-    }
-
-    static void doStateInitialization(Token currentToken) {
-        if (currentToken.type == TokenType.EQUALS) {
-            index++;
-            stackState.push(EdenState.DO_INITIALIZE);
-            stackState.push(EdenState.EXPRESSION);
-        } else {
-            programStack.pop();
-        }
-    }
-
-    static void doStateCalcShift() {
-        index++;
-        if (isInterpreter) {
-            int shift = Integer.parseInt(String.valueOf(programStack.pop()));
-            int index = Integer.parseInt(String.valueOf(programStack.pop()));
-            edenVarList.get(index).shift = shift;
-        } else {
-            // TODO: 0 everytime, and plus to eden_a
-            int index = Integer.parseInt(String.valueOf(programStack.pop()));
-            String identifier = edenVarList.get(index).identifier;
-            edenVarList.get(index).shift = 0;
-            programCode.append("\t;DoCalcShift\n");
-            programCode.append("\tmov eax, [").append(identifier).append("]\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tadd eax, ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doTokenSemicolon(Token currentToken) {
-        if (currentToken.type == TokenType.SEMICOLON) {
-            index++;
-            return;
-        }
-        printErrToken(currentToken, "Expression must ends with [;], but found: ");
-    }
-
-    static void doTokenOpenBracket(Token currentToken) {
-        if (currentToken.type == TokenType.OPEN_BRACKET) {
-            index++;
-            return;
-        }
-        printErrToken(currentToken, "Expected [(], but found: ");
-    }
-
-    static void doTokenCloseBracket(Token currentToken) {
-        if (currentToken.type == TokenType.CLOSE_BRACKET) {
-            index++;
-            return;
-        }
-        printErrToken(currentToken, "Inner expression must ends with [)], but found: ");
-    }
-
-    static void doStateExpression(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.PLUS || cType == TokenType.MINUS || cType == TokenType.OPEN_BRACKET
-                || cType == TokenType.NUMBER || cType == TokenType.STRING || cType == TokenType.SYMBOL) {
-            stackState.push(EdenState.BITWISE);
-            stackState.push(EdenState.LOGICAL);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.INDEX);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.KEYWORD) {
-            String tValue = String.valueOf(currentToken.value);
-            boolean isWincall = tValue.equalsIgnoreCase("wincall");
-            if (isWincall) {
-                index++;
-                stackState.push(EdenState.DO_WINCALL);
-                stackState.push(EdenState.TOKEN_CLOSE_BRACKET);
-                stackState.push(EdenState.EXPRESSION_LIST);
-                stackState.push(EdenState.WINCALL_NAME);
-                stackState.push(EdenState.TOKEN_OPEN_BRACKET);
-                return;
-            }
-        }
-        printErrToken(currentToken, "Expression expects [+,-,NUMBER,(], but found: ");
-    }
-
-    static void doStateWinCallName(Token currentToken) {
-        if (currentToken.type != TokenType.STRING) {
-            printErrToken(currentToken, "Wincall name must be a STRING, but found: ");
-        }
-        index++;
-        Token nextToken = tokenList.get(index);
-        if (nextToken.type == TokenType.COMMA) {
-            index++;
-        } else {
-            if (nextToken.type == TokenType.CLOSE_BRACKET) {
-                stackState.pop();
-            } else {
-                printErrToken(nextToken, "After wincall name must be [,], but found: ");
-            }
-        }
-        stackSizeBeforeWinCallName = programStack.size();
-        programStack.push(currentToken.value);
-        String cValue = String.valueOf(currentToken.value);
-        if (!externWinCallList.contains(cValue)) {
-            externWinCallList.add(cValue);
-        }
-    }
-
-    static void doStateExpressionList() {
-        stackState.push(EdenState.NEXT_EXPRESSION);
-        stackState.push(EdenState.EXPRESSION);
-    }
-
-    static void doStateNextExpression(Token currentToken) {
-        if (currentToken.type == TokenType.COMMA) {
-            index++;
-            stackState.push(EdenState.EXPRESSION_LIST);
-        }
-    }
-
-    static void doStateIndex(Token currentToken) {
-        if (currentToken.type == TokenType.OPEN_SQUARE_BRACKET) {
-            index++;
-            stackState.push(EdenState.DO_OP_INDEX);
-            stackState.push(EdenState.EXPRESSION);
-        }
-    }
-
-    static void doStateBitwise(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.B_AND) {
-            index++;
-            stackState.push(EdenState.DO_OP_BAND);
-            stackState.push(EdenState.LOGICAL);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.B_OR) {
-            index++;
-            stackState.push(EdenState.DO_OP_BOR);
-            stackState.push(EdenState.LOGICAL);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-        }
-    }
-
-    static void doStateLogical(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.GREATER) {
-            index++;
-            stackState.push(EdenState.DO_OP_GREATER);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.LESS) {
-            index++;
-            stackState.push(EdenState.DO_OP_LESS);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.EQUALS) {
-            index++;
-            stackState.push(EdenState.DO_OP_EQUALS);
-            stackState.push(EdenState.SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-        }
-    }
-
-    static void doStateShift(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.L_SHIFT) {
-            index++;
-            stackState.push(EdenState.DO_OP_L_SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.R_SHIFT) {
-            index++;
-            stackState.push(EdenState.DO_OP_R_SHIFT);
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.UNAR);
-        }
-    }
-
-    static void doStateAddition(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.PLUS) {
-            index++;
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.DO_OP_PLUS);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.MINUS) {
-            index++;
-            stackState.push(EdenState.ADDITION);
-            stackState.push(EdenState.DO_OP_MINUS);
-            stackState.push(EdenState.UNAR);
-        }
-    }
-
-    static void doStateStarSlash(Token currentToken) {
-        TokenType cType = currentToken.type;
-        if (cType == TokenType.MULTIPLY) {
-            index++;
-            stackState.push(EdenState.STARSLASH);
-            stackState.push(EdenState.DO_OP_MULTIPLY);
-            stackState.push(EdenState.UNAR);
-            return;
-        }
-        if (cType == TokenType.DIVIDE) {
-            index++;
-            stackState.push(EdenState.STARSLASH);
-            stackState.push(EdenState.DO_OP_DIVIDE);
-            stackState.push(EdenState.UNAR);
-        }
-        // TODO: ADD POWER OPERATION (^)
-    }
-
-    static void doStateUnar(Token currentToken) {
-        if (currentToken.type == TokenType.PLUS) {
-            index++;
-            stackState.push(EdenState.STARSLASH);
-            stackState.push(EdenState.ARG);
-            return;
-        }
-        if (currentToken.type == TokenType.MINUS) {
-            index++;
-            stackState.push(EdenState.DO_OP_UNAR_MINUS);
-            stackState.push(EdenState.STARSLASH);
-            stackState.push(EdenState.ARG);
-            return;
-        }
-        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING
-                || currentToken.type == TokenType.OPEN_BRACKET || currentToken.type == TokenType.SYMBOL) {
-            stackState.push(EdenState.STARSLASH);
-            stackState.push(EdenState.ARG);
-        }
-    }
-
-    static void doStateArg(Token currentToken) {
-        if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING
-                || currentToken.type == TokenType.SYMBOL) {
-            stackState.push(EdenState.DO_SKIP);
-            return;
-        }
-        if (currentToken.type == TokenType.OPEN_BRACKET) {
-            index++;
-            stackState.push(EdenState.TOKEN_CLOSE_BRACKET);
-            stackState.push(EdenState.EXPRESSION);
-            // Do not forget put return here, when add more code below
-        }
-    }
-
-    static void doStateSkip(Token currentToken) {
-        if (isInterpreter) {
-            index++;
-            if (currentToken.type == TokenType.NUMBER || currentToken.type == TokenType.STRING) {
-                 programStack.push(currentToken.value);
-             }
-             if (currentToken.type == TokenType.SYMBOL) {
-                 programStack.push(getEdenVarByIdentifier(String.valueOf(currentToken.value)).value);
-             }
-        } else {
-            index++;
-            if (currentToken.type == TokenType.STRING) {
-                String stringValue = String.valueOf(currentToken.value);
-                stringConstants.add(stringValue);
-                String address = "str_" + (stringConstants.size() - 1);
-                programCode.append("\t;OpPushString\n");
-                programCode.append("\tpush ").append(address).append("\n");
-            } else if (currentToken.type == TokenType.NUMBER) {
-                programCode.append("\t;OpPushNum\n");
-                programCode.append("\tpush ").append(currentToken.value).append("\n");
-            } else if (currentToken.type == TokenType.SYMBOL) {
-                programCode.append("\t;OpPushVar\n");
-                programCode.append("\tmov eax, [").append(currentToken.value).append("]\n");
-                programCode.append("\tpush eax\n");
-            }
-        }
-    }
-
-    static void doOpPrint() {
-        if (isInterpreter) {
-            if (programStack.size() < 1) {
-                printErr("Nothing to print");
-            }
-            String value = String.valueOf(programStack.pop());
-            printWithNewLine(value, System.out);
-        } else {
-            programCode.append("\t;OpPrint\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tcall print\n");
-        }
-    }
-
-    static void doOpWinCall() {
-        if (isInterpreter) {
-            String nameOfWinCall = String.valueOf(programStack.get(stackSizeBeforeWinCallName));
-            switch (nameOfWinCall) {
-                case "GetStdHandle": {
-                    int handleValue = Integer.parseInt(String.valueOf(programStack.pop()));
-                    programStack.pop();
-                    programStack.push(MAX_C_INTEGER + handleValue);
-                } break;
-                case "WriteFile": {
-                    String handler = String.valueOf(programStack.pop());
-                    String strToPrint = String.valueOf(programStack.pop());
-                    int sizeOfStr = Integer.parseInt(String.valueOf(programStack.pop()));
-                    programStack.pop();
-                    programStack.pop();
-                    programStack.pop();
-                    if (sizeOfStr < strToPrint.length()) { strToPrint = strToPrint.substring(0, sizeOfStr); }
-                    switch (handler) {
-                        case HDL_STD_OUT: printWithNewLine(strToPrint, System.out); break;
-                        case HDL_STD_ERR: printWithNewLine(strToPrint, System.err); break;
-                        default: {
-                            printErr("Unsupported handler: " + handler);
-                        }
-                    }
-                    programStack.push(1);
-                } break;
-                default: {
-                    printErr("Unknown wincall name: " + nameOfWinCall);
-                }
-            }
-        } else {
-            String nameOfWinCall = String.valueOf(programStack.pop());
-            programCode.append("\t;OpWinCall\n");
-            programCode.append("\tcall ").append(nameOfWinCall).append("\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void printWithNewLine(String strToPrint, PrintStream printStream) {
-        printStream.printf(strToPrint.replaceAll("[\\\\]", "%"));
-    }
-
-    static void doOpIndex(Token currentToken) {
-        if (currentToken.type == TokenType.CLOSE_SQUARE_BRACKET) {
-            index++;
-            if (isInterpreter) {
-                int indexInValue = Integer.parseInt(String.valueOf(programStack.pop()));
-                String strValue = String.valueOf(programStack.pop());
-                programStack.push(String.valueOf(strValue.charAt(indexInValue)));
-            } else {
-                programCode.append("\t;DoOpIndex\n");
-                programCode.append("\tpop ebx\n");
-                programCode.append("\tpop eax\n");
-                programCode.append("\tadd eax, ebx\n");
-                programCode.append("\tpush eax\n");
-            }
-        }
-    }
-
-    static void doInitialize() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Initializations require two elements, but found less");
-            }
-            Object value = programStack.pop();
-            String identifier = String.valueOf(programStack.pop());
-            EdenVar var = getEdenVarByIdentifier(identifier);
-            switch (var.type) {
-                default:
-                case NONE:
-                case BOOL:
-                case CHAR:
-                case INT: {
-                    try {
-                        var.value = Integer.parseInt(String.valueOf(value));
-                    } catch (NumberFormatException ignored) {
-                        var.value = (int)String.valueOf(value).charAt(0);
-                    }
-                    break;
-                }
-                case STRING: {
-                    if (var.shift == -1) {
-                        var.value = value;
-                    } else {
-                        char[] origValue = String.valueOf(var.value).toCharArray();
-                        origValue[var.shift] = String.valueOf(value).charAt(0);
-                        var.value = String.valueOf(origValue);
-                    }
-                    break;
-                }
-            }
-        } else {
-            String identifier = String.valueOf(programStack.pop());
-            EdenVar var = getEdenVarByIdentifier(identifier);
-            programCode.append("\t;OpInitialize\n");
-            programCode.append("\tpop ebx\n");
-            if (var.shift == -1) {
-                programCode.append("\tmov [").append(identifier).append("], ebx\n");
-            } else {
-                programCode.append("\tpop eax\n");
-                programCode.append("\tmov ecx, [ebx]\n");
-                programCode.append("\tmov [eax], ecx\n");
-            }
-        }
-    }
-
-    static void doOpPlus() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Plus operation expected two integers, but found less");
-            }
-            Object first = programStack.pop();
-            Object second = programStack.pop();
-            int result = Integer.parseInt(String.valueOf(first)) + Integer.parseInt(String.valueOf(second));
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpPlus\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tadd eax, ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpMinus() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Minus operation expected two integers, but found less");
-            }
-            Object second = programStack.pop();
-            Object first = programStack.pop();
-            int result = Integer.parseInt(String.valueOf(first)) - Integer.parseInt(String.valueOf(second));
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpMinus\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tsub eax, ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpMultiply() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Multiply operation expected two integers, but found less");
-            }
-            Object first = programStack.pop();
-            Object second = programStack.pop();
-            int result = Integer.parseInt(String.valueOf(first)) * Integer.parseInt(String.valueOf(second));
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpMultiply\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tmul ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpDivide() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Divide operation expected two integers, but found less");
-            }
-            Object second = programStack.pop();
-            Object first = programStack.pop();
-            int result = Integer.parseInt(String.valueOf(first)) / Integer.parseInt(String.valueOf(second));
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpDivide\n");
-            programCode.append("\tpop ecx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\txor edx, edx\n");
-            programCode.append("\tdiv ecx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpUnarMinus() {
-        if (isInterpreter) {
-            if (programStack.size() < 1) {
-                printErr("Unar minus operation expected integer, but found nothing");
-            }
-            Object first = programStack.pop();
-            int result = Integer.parseInt(String.valueOf(first)) * -1;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpUnarMinus\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tneg eax\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpEquals() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Equals operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first == second ? 1 : 0;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpEquals\n");
-            programCode.append("\txor ecx, ecx\n");
-            programCode.append("\tmov edx, 1\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tcmp eax, ebx\n");
-            programCode.append("\tcmove ecx, edx\n");
-            programCode.append("\tpush ecx\n");
-        }
-    }
-
-    static void doOpGreater() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Greater operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first > second ? 1 : 0;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpGreater\n");
-            programCode.append("\txor ecx, ecx\n");
-            programCode.append("\tmov edx, 1\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tcmp eax, ebx\n");
-            programCode.append("\tcmovg ecx, edx\n");
-            programCode.append("\tpush ecx\n");
-        }
-    }
-
-    static void doOpLess() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Greater operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first < second ? 1 : 0;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpLess\n");
-            programCode.append("\txor ecx, ecx\n");
-            programCode.append("\tmov edx, 1\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tcmp eax, ebx\n");
-            programCode.append("\tcmovl ecx, edx\n");
-            programCode.append("\tpush ecx\n");
-        }
-    }
-
-    static void doOpLeftShift() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Left shift operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first << second;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpLeftShift\n");
-            programCode.append("\tpop ecx\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tshl ebx, cl\n");
-            programCode.append("\tpush ebx\n");
-        }
-    }
-
-    static void doOpRightShift() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Right shift operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first >> second;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpRightShift\n");
-            programCode.append("\tpop ecx\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tshr ebx, cl\n");
-            programCode.append("\tpush ebx\n");
-        }
-    }
-
-    static void doOpBitAnd() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Bitwise and operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first & second;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpBitAnd\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tand eax, ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static void doOpBitOr() {
-        if (isInterpreter) {
-            if (programStack.size() < 2) {
-                printErr("Bitwise or operation expected two operands, but found less");
-            }
-            int second = Integer.parseInt(String.valueOf(programStack.pop()));
-            int first = Integer.parseInt(String.valueOf(programStack.pop()));
-            int result = first | second;
-            programStack.push(result);
-        } else {
-            programCode.append("\t;OpBitOr\n");
-            programCode.append("\tpop eax\n");
-            programCode.append("\tpop ebx\n");
-            programCode.append("\tor eax, ebx\n");
-            programCode.append("\tpush eax\n");
-        }
-    }
-
-    static String getIdentifier(Token currentToken) {
-        if (currentToken.type != TokenType.SYMBOL) {
-            printErrToken(currentToken, "Identifier must be type of SYMBOL, but found: ");
-        }
-        return String.valueOf(currentToken.value);
-    }
-
-    static void declareVar(Token currentToken) {
-        String identifier = getIdentifier(currentToken);
-        EdenVar var = edenVarList.get(edenVarList.size() - 1);
-        if (var.identifier.equalsIgnoreCase(identifier)) {
-            printErrToken(currentToken, "Identifier already declared: ");
-        }
-        var.identifier = identifier;
-        programStack.push(identifier);
-    }
-
-    static EdenVar getEdenVarByIdentifier(String identifier) {
-        for (EdenVar var : edenVarList) {
-            if (var.identifier.equalsIgnoreCase(identifier)) {
-                return var;
-            }
-        }
-        printErr("Identifier is not declared: " + identifier);
-        return new EdenVar(EdenType.NONE);
-    }
+//    @Deprecated
+//    static void doOpWinCall() {
+//        if (isInterpreter) {
+//            String nameOfWinCall = String.valueOf(programStack.get(stackSizeBeforeWinCallName));
+//            switch (nameOfWinCall) {
+//                case "GetStdHandle": {
+//                    int handleValue = Integer.parseInt(String.valueOf(programStack.pop()));
+//                    programStack.pop();
+//                    programStack.push(MAX_C_INTEGER + handleValue);
+//                } break;
+//                case "WriteFile": {
+//                    String handler = String.valueOf(programStack.pop());
+//                    String strToPrint = String.valueOf(programStack.pop());
+//                    int sizeOfStr = Integer.parseInt(String.valueOf(programStack.pop()));
+//                    programStack.pop();
+//                    programStack.pop();
+//                    programStack.pop();
+//                    if (sizeOfStr < strToPrint.length()) { strToPrint = strToPrint.substring(0, sizeOfStr); }
+//                    switch (handler) {
+//                        case HDL_STD_OUT: printWithNewLine(strToPrint, System.out); break;
+//                        case HDL_STD_ERR: printWithNewLine(strToPrint, System.err); break;
+//                        default: {
+//                            printErr("Unsupported handler: " + handler);
+//                        }
+//                    }
+//                    programStack.push(1);
+//                } break;
+//                default: {
+//                    printErr("Unknown wincall name: " + nameOfWinCall);
+//                }
+//            }
+//        } else {
+//            String nameOfWinCall = String.valueOf(programStack.pop());
+//            programCode.append("\t;OpWinCall\n");
+//            programCode.append("\tcall ").append(nameOfWinCall).append("\n");
+//            programCode.append("\tpush eax\n");
+//        }
+//    }
+//
+//    static void printWithNewLine(String strToPrint, PrintStream printStream) {
+//        printStream.printf(strToPrint.replaceAll("[\\\\]", "%"));
+//    }
 
     static void printErrToken(Token token, String errMessage) {
         int offset = String.valueOf(token.value).length();
@@ -1212,66 +309,6 @@ public class Eden {
     static void printErr(String errMessage) {
         System.err.printf("ERROR: %s%n", errMessage);
         System.exit(2);
-    }
-
-    enum EdenState {
-        PROGRAM,
-        STATEMENT,
-        VAR_INITIALIZATION,
-        VAR_DECLARATION,
-        IDENTIFIER,
-        INITIALIZATION,
-        CALC_SHIFT,
-        NEXT_IDENTIFIER,
-        PRINT_STATEMENT,
-        WHILE_STATEMENT,
-        WHILE_COND_STATEMENT,
-        END_WHILE,
-        IF_STATEMENT,
-        IF_COND_STATEMENT,
-        ELSE_STATEMENT,
-        NEXT_STATEMENT,
-        BLOCK_STATEMENT,
-        DO_INITIALIZE,
-        DO_PRINT,
-        DO_SKIP,
-        EXPRESSION,
-        NEXT_EXPRESSION,
-        EXPRESSION_LIST,
-        WINCALL_NAME,
-        DO_WINCALL,
-        DO_OP_INDEX,
-        DO_OP_BAND,
-        DO_OP_BOR,
-        DO_OP_L_SHIFT,
-        DO_OP_R_SHIFT,
-        DO_OP_PLUS,
-        DO_OP_MINUS,
-        DO_OP_UNAR_MINUS,
-        DO_OP_MULTIPLY,
-        DO_OP_DIVIDE,
-        DO_OP_GREATER,
-        DO_OP_LESS,
-        DO_OP_EQUALS,
-        TOKEN_OPEN_BRACKET,
-        TOKEN_CLOSE_BRACKET,
-        TOKEN_SEMICOLON,
-        INDEX,
-        BITWISE,
-        LOGICAL,
-        SHIFT,
-        ADDITION,
-        STARSLASH,
-        UNAR,
-        ARG
-    }
-
-    enum EdenType {
-        NONE,
-        INT,
-        BOOL,
-        CHAR,
-        STRING
     }
 
     enum TokenType {
@@ -1301,27 +338,6 @@ public class Eden {
         SYMBOL,
         KEYWORD,
         END
-    }
-
-    static class EdenVar {
-        EdenType type;
-        String identifier;
-        Object value;
-        int shift;
-
-        EdenVar(EdenType type) {
-            this.type = type;
-            this.identifier = "";
-            this.shift = -1;
-            switch (type) {
-                default:
-                case STRING:
-                case NONE: this.value = null;
-                case CHAR:
-                case BOOL:
-                case INT: this.value = 0;
-            }
-        }
     }
 
     static class Token {
@@ -1381,6 +397,7 @@ public class Eden {
             initKeywords();
         }
 
+        @Deprecated
         void crossReference() {
             Stack<Integer> stack = new Stack<>();
             for (Token t : tokenList) {
