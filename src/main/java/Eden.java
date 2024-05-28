@@ -1,3 +1,5 @@
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -13,14 +15,20 @@ public class Eden {
 //    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
 //    private static final String HDL_STD_OUT = "2147483636";
 //    private static final String HDL_STD_ERR = "2147483635";
+    private static final int MAX_INTERPRET_MEMORY_SIZE = 1024 * 32;
     static List<Token> tokenList = new ArrayList<>();
     static List<String> stringConstants = new ArrayList<>();
     static List<String> externWinCallList = new ArrayList<>();
     static StringBuilder programCode = new StringBuilder();
+    static int tokenIndex = 0;
+    static String currentClassName;
+    static List<Op> intermediateRepresentation = new ArrayList<>();
+    static List<SymbolTableElem> symbolTable = new ArrayList<>();
+    static byte[] Memory = new byte[MAX_INTERPRET_MEMORY_SIZE];
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         // Args
         if (args.length == 0) {
             System.out.println("Usage: eden -s scrName.eden");
@@ -58,22 +66,32 @@ public class Eden {
         lexer.tokenize();
         lexer.clearComments();
 
-        lexer.tokenList.forEach(System.out::println);
+        tokenList.forEach(System.out::println);
 
         // Parsing.
-        // Analysis.
-        // Optimising.
+        parse();
+        // Analysis - Type checking
         // IR
+        intermediateRepresentation.forEach(Op::generate);
+        // Optimising.
         // Interpret || CodeGen
+        if (!isInterpreter) {
+            writeAsmFile(sourceName);
+            boolean isSuccess = compileToExe(sourceName) == 0;
+            if (isSuccess && isRunAfterCompilation) {
+                System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
+            }
+        }
     }
 
-    private static void run(String execCmd) throws IOException, InterruptedException {
+    private static String run(String execCmd) throws IOException, InterruptedException {
         System.out.println("[CMD] " + execCmd);
         Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             System.err.println("Error while execute command: " + execCmd + "\n" + readInputStream(process.getErrorStream()));
         }
+        return readInputStream(process.getInputStream());
     }
 
     private static String readInputStream(InputStream inputStream) throws IOException {
@@ -84,7 +102,6 @@ public class Eden {
         return sb.toString();
     }
 
-    @Deprecated
     static int compileToExe(String sourceName) {
         try {
             String name = sourceName.split("[.]")[0];
@@ -100,17 +117,16 @@ public class Eden {
         }
     }
 
-    @Deprecated
     static void writeAsmFile(String sourceName) {
         try {
             File output = new File(sourceName.split("[.]")[0]+".asm");
             FileWriter fw = new FileWriter(output);
             writeHeader(fw);
             writeData(fw);
-//            writeVariables(fw);
+            writeVariables(fw);
             writeText(fw);
             fw.write(programCode.toString());
-            fw.write("\tcall exit\n");
+            fw.write("\n\tcall exit\n");
             fw.flush();
             fw.close();
         } catch (IOException e) {
@@ -132,18 +148,18 @@ public class Eden {
     static void writeData(FileWriter fw) throws IOException {
         int index = 0;
         fw.write("section .data\n");
-        fw.write("\tstr_NL db `\\r\\n`\n");
+        fw.write("\tstr_NL db `\\r\\n`, 0\n");
         for (String stringConstant : stringConstants) {
             String fullName = "str_" + index++;
-            fw.write("\t" + fullName + " db `" + stringConstant.replaceAll("\\\\n", "\\\\r\\\\n") + "`,0\n");
+            fw.write("\t" + fullName + " db `" + stringConstant.replaceAll("\\\\n", "\\\\r\\\\n") + "`, 0\n");
         }
     }
 
-//    static void writeVariables(FileWriter fw) throws IOException {
-//        fw.write("section .bss\n");
-//        fw.write("\tStdHandle resd 1\n");
-//        fw.write("\tdigitBuffer resb 100\n");
-//        fw.write("\tdigitBufferPos resb 8\n");
+    static void writeVariables(FileWriter fw) throws IOException {
+        fw.write("section .bss\n");
+        fw.write("\tStdHandle resd 1\n");
+        fw.write("\tdigitBuffer resb 100\n");
+        fw.write("\tdigitBufferPos resb 8\n");
 //        for (EdenVar var : edenVarList) {
 //            switch (var.type) {
 //                case STRING:
@@ -163,7 +179,7 @@ public class Eden {
 //                default: fw.write("\t; There is some problem with var declaration in compiler, probably\n");
 //            }
 //        }
-//    }
+    }
 
     static void writeText(FileWriter fw) throws IOException {
         fw.write("section .text\n");
@@ -300,6 +316,217 @@ public class Eden {
 //        printStream.printf(strToPrint.replaceAll("[\\\\]", "%"));
 //    }
 
+    static void parse() {
+        parseClass();
+    }
+
+    static void parseClass() {
+        expectKeyword("class");
+        expectClassName();
+        expectOpenCurly();
+        expectClassDec();
+        expectClassBody();
+        expectCloseCurly();
+    }
+
+    static void expectClassDec() {
+        // TODO:
+    }
+
+    static void expectClassBody() {
+        // new | func | method
+        String[] legalTokens = new String[]{"new", "func", "method"};
+        while (hasNextTokenValues(legalTokens)) {
+            Optional<String> procType = expectTokensOrEmpty(legalTokens);
+            assert procType.isPresent();
+            switch (procType.get()) {
+                case "func": {
+                    expectFunc();
+                    break;
+                }
+                case "new": {
+                    expectConstructor();
+                    break;
+                }
+                case "method": {
+                    expectMethod();
+                    break;
+                }
+                case "}": { break; }
+                default: {
+                    printErrToken(tokenList.get(tokenIndex), "Expected constructor, function or method declarations, but found");
+                }
+            }
+        }
+    }
+
+    static void expectFunc() {
+        EdenType type = expectType("void", "int");
+        Optional<String> rawName = expectSymbol();
+        assert rawName.isPresent();
+        String name = rawName.get();
+        int count = expectParametersDec();
+        OpFunc func = new OpFunc(currentClassName+"."+name, type.name(), count);
+        intermediateRepresentation.add(func);
+        expectBlockStatement();
+    }
+
+    static void expectConstructor() {
+        // TODO
+    }
+
+    static void expectMethod() {
+        // TODO
+    }
+
+    static int expectParametersDec() {
+        int count = 0;
+        expectTokenType(TokenType.OPEN_BRACKET);
+        while (!hasNextTokenValues(")")) {
+            EdenType type = expectType("int", "bool");
+            Optional<String> rawName = expectSymbol();
+            assert rawName.isPresent();
+            String name = rawName.get();
+            symbolTable.add(new SymbolTableElem(name, type.name(), ElemKind.ARGUMENT, count, true));
+            count++;
+            if (hasNextTokenValues(",")) {
+                tokenIndex++;
+            }
+        }
+        expectTokenType(TokenType.CLOSE_BRACKET);
+        return count;
+    }
+
+    static void expectBlockStatement() {
+        expectTokenType(TokenType.OPEN_CURLY_BRACKET);
+        while (!hasNextTokenValues("}")) {
+            expectStatement();
+        }
+        expectTokenType(TokenType.CLOSE_CURLY_BRACKET);
+    }
+
+    static void expectStatement() {
+        String[] legalTokens = new String[]{"~"};
+        Optional<String> tokenValue = expectTokensOrEmpty(legalTokens);
+        assert tokenValue.isPresent();
+        switch (tokenValue.get()) {
+            case "~": {
+                expectPrintStatement();
+                break;
+            }
+            default: {
+                printErrToken(tokenList.get(tokenIndex), "Unknown statement");
+            }
+        }
+        expectTokenType(TokenType.SEMICOLON);
+    }
+
+    static void expectPrintStatement() {
+        expectExpression();
+        intermediateRepresentation.add(new OpPrint());
+    }
+
+    static void expectExpression() {
+        while (!hasNextTokenValues(";")) {
+            Token t = tokenList.get(tokenIndex);
+            if (t.type.equals(TokenType.STRING)) {
+                intermediateRepresentation.add(new OpPushString(t.value));
+                tokenIndex++;
+            }
+            // TODO
+        }
+    }
+
+    static EdenType expectType(String... types) {
+        Optional<String> rawValue = expectRawType(types);
+        assert rawValue.isPresent();
+        return EdenType.valueOf(rawValue.get().toUpperCase());
+    }
+
+    static Optional<String> expectRawType(String... types) {
+        return expectKeywords(types);
+    }
+
+    static void expectCloseCurly() {
+        expectTokenType(TokenType.CLOSE_CURLY_BRACKET);
+    }
+
+    static void expectOpenCurly() {
+        expectTokenType(TokenType.OPEN_CURLY_BRACKET);
+    }
+
+    static void expectClassName() {
+        Optional<String> name = expectSymbol();
+        assert name.isPresent();
+        currentClassName = name.get();
+    }
+
+    static Optional<String> expectSymbol() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.SYMBOL)) {
+            tokenIndex++;
+            return Optional.of(String.valueOf(t.value));
+        } else {
+            printErrToken(t, "Expected symbol, but found");
+        }
+        return Optional.empty();
+    }
+
+    static void expectKeyword(String value) {
+        Token t = tokenList.get(tokenIndex);
+        if (value.equals(t.value)) {
+            tokenIndex++;
+        } else {
+            printErrToken(t, "Expected " + value + ", but found");
+        }
+    }
+
+    static Optional<String> expectKeywords(String... values) {
+        Token t = tokenList.get(tokenIndex);
+        assert t.type == TokenType.KEYWORD;
+        String tokenValue = String.valueOf(t.value);
+        for (String v : values) {
+            if (v.equals(tokenValue)) {
+                tokenIndex++;
+                return Optional.of(v);
+            }
+        }
+        printErrToken(t, "Expected " + Arrays.toString(values) + ", but found");
+        return Optional.empty();
+    }
+
+    static boolean hasNextTokenValues(String... values) {
+        Token t = tokenList.get(tokenIndex);
+        String tokenValue = String.valueOf(t.value);
+        for (String v : values) {
+            if (v.equals(tokenValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static Optional<String> expectTokensOrEmpty(String... values) {
+        Token t = tokenList.get(tokenIndex);
+        String tokenValue = String.valueOf(t.value);
+        for (String v : values) {
+            if (v.equals(tokenValue)) {
+                tokenIndex++;
+                return Optional.of(v);
+            }
+        }
+        return Optional.empty();
+    }
+
+    static void expectTokenType(TokenType type) {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(type)) {
+            tokenIndex++;
+        } else {
+            printErrToken(t, "Expected '%', but found:".replaceAll("[%]", String.valueOf(type)));
+        }
+    }
+
     static void printErrToken(Token token, String errMessage) {
         int offset = String.valueOf(token.value).length();
         System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, errMessage, token.type, token.value);
@@ -311,10 +538,122 @@ public class Eden {
         System.exit(2);
     }
 
+    interface Op {
+        void interpret();
+        void generate();
+        String toString();
+    }
+
+    static class OpFunc implements Op {
+        private final String name;
+        private final String type;
+        private final int localVarCount;
+        private final boolean isMain;
+
+        public OpFunc(String name, String type, int localVarCount) {
+            this.name = name;
+            this.type = type;
+            this.localVarCount = localVarCount;
+            this.isMain = name.equals("main");
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpFunc ").append(toString());
+            programCode.append("\n").append(name).append(":");
+            programCode.append("\n\tMOV eax, 0");
+            programCode.append("\n\tMOV ebx, ").append(localVarCount);
+            programCode.append("\n").append(name).append("Init:");
+            programCode.append("\n\tCMP eax, ebx");
+            programCode.append("\n\tJE ").append(name).append("Body");
+            programCode.append("\n\tPUSH 0");
+            programCode.append("\n\tINC eax");
+            programCode.append("\n\tJMP ").append(name).append("Init");
+            programCode.append("\n").append(name).append("Body:");
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Name: %s, type: %s, localVarCount: %d", name, type, localVarCount);
+        }
+    }
+
+    static class OpPrint implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPrint");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tcall print");
+        }
+    }
+
+    static class OpPushString implements Op {
+        private final String value;
+
+        public OpPushString(Object value) {
+            this.value = String.valueOf(value);
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            String cmpName = "str_" + stringConstants.size();
+            stringConstants.add(value);
+            programCode.append("\n;OpPushString: ").append(value).append("");
+            programCode.append("\n\tPUSH ").append(cmpName);
+        }
+    }
+
+    enum ElemKind {
+        FIELD,
+        STATIC,
+        ARGUMENT,
+        LOCAL,
+        CONST
+    }
+
+    static class SymbolTableElem {
+        String name;
+        String type;
+        ElemKind kind;
+        int index;
+        boolean isRoutine = false;
+
+        public SymbolTableElem(String name, String type, ElemKind kind, int index, boolean isRoutine) {
+            this.name = name;
+            this.type = type;
+            this.kind = kind;
+            this.index = index;
+            this.isRoutine = isRoutine;
+        }
+    }
+
+    enum EdenType {
+        VOID,
+        BOOL,
+        INT
+    }
+
     enum TokenType {
         //CHARACTER,
         SEMICOLON,
         COMMA,
+        WIN_CALL_SYMBOL,
         OPEN_BRACKET,
         CLOSE_BRACKET,
         OPEN_CURLY_BRACKET,
@@ -374,7 +713,7 @@ public class Eden {
     }
 
     static class Lexer {
-        String allowedCharacters = "~+-*/;()=><!{}().,'\"|&[]";
+        String allowedCharacters = "~+-*/;()=><!{}().,'\"|&[]:";
         String source;
         List<Token> tokenList;
         List<String> keywordList;
@@ -457,6 +796,11 @@ public class Eden {
 
         void initKeywords() {
             keywordList.add("class");
+            keywordList.add("use");
+            keywordList.add("final");
+            keywordList.add("func");
+            keywordList.add("new");
+            keywordList.add("method");
             keywordList.add("void");
             keywordList.add("char");
             keywordList.add("bool");
@@ -467,7 +811,7 @@ public class Eden {
             keywordList.add("while");
             keywordList.add("true");
             keywordList.add("false");
-            keywordList.add("wincall");
+            keywordList.add("win");
         }
 
         void clearComments() {
@@ -655,6 +999,10 @@ public class Eden {
                     break;
                 }
                 case '.': break;
+                case ':': {
+                    tokenList.add(new Token(TokenType.WIN_CALL_SYMBOL, currentChar, new Location(line, column)));
+                    break;
+                }
                 default: {
                     printErrToken(new Token(TokenType.SYMBOL, currentChar, new Location(line, column)), "Lexer: Unknown character");
                 }

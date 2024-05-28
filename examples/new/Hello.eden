@@ -1,0 +1,17 @@
+class Hello {
+    func void main() {
+        ~ "Hello from Eden!\n";
+    }
+//
+//    method int test(bool kek) {
+//        ~ 2 + 3;
+//    }
+//
+//    func bool another(int a, bool b) {
+//        ~ "sss";
+//    }
+//
+//    new Hello() {
+//        ~ "constructor";
+//    }
+}
