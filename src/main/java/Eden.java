@@ -24,6 +24,9 @@ public class Eden {
     static String currentClassName;
     static List<Op> intermediateRepresentation = new ArrayList<>();
     static List<SymbolTableElem> symbolTable = new ArrayList<>();
+    static int localVarShift = 0;
+    static List<SymbolTableElem> usedVariables = new ArrayList<>();
+    static int uniqueIndex = 0;
     static byte[] Memory = new byte[MAX_INTERPRET_MEMORY_SIZE];
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
@@ -160,22 +163,22 @@ public class Eden {
         fw.write("\tStdHandle resd 1\n");
         fw.write("\tdigitBuffer resb 100\n");
         fw.write("\tdigitBufferPos resb 8\n");
-//        for (EdenVar var : edenVarList) {
+        fw.write("\tlocalPointer resd 1\n");
+//        for (SymbolTableElem var : usedVariables) {
 //            switch (var.type) {
-//                case STRING:
-//                case INT: {
-//                    fw.write("\t" + var.identifier + " resb 4\n");
+//                case "string":
+//                case "int": {
+//                    fw.write("\t" + name + " resb 4\n");
 //                    break;
 //                }
-//                case BOOL: {
+//                case "bool": {
 //                    fw.write("\t" + var.identifier + " resb 1\n");
 //                    break;
 //                }
-//                case CHAR: {
-//                    fw.write("\t" + var.identifier + " resb 2\n");
-//                    break;
-//                }
-//                case NONE:
+////                case CHAR: {
+////                    fw.write("\t" + var.identifier + " resb 2\n");
+////                    break;
+////                }
 //                default: fw.write("\t; There is some problem with var declaration in compiler, probably\n");
 //            }
 //        }
@@ -367,8 +370,10 @@ public class Eden {
         String name = rawName.get();
         int count = expectParametersDec();
         OpFunc func = new OpFunc(currentClassName+"."+name, type.name(), count);
+        localVarShift = 0;
         intermediateRepresentation.add(func);
         expectBlockStatement();
+        clearLocalVarsSymbolTable(currentClassName+"."+name);
     }
 
     static void expectConstructor() {
@@ -381,13 +386,15 @@ public class Eden {
 
     static int expectParametersDec() {
         int count = 0;
+        int shift = 0;
         expectTokenType(TokenType.OPEN_BRACKET);
         while (!hasNextTokenValues(")")) {
-            EdenType type = expectType("int", "bool");
+            EdenType type = expectType("int", "bool", "string");
             Optional<String> rawName = expectSymbol();
             assert rawName.isPresent();
             String name = rawName.get();
-            symbolTable.add(new SymbolTableElem(name, type.name(), ElemKind.ARGUMENT, count, true));
+            shift += calculateShift(type.name());
+            symbolTable.add(new SymbolTableElem(name, type.name(), ElemKind.ARGUMENT, shift, true));
             count++;
             if (hasNextTokenValues(",")) {
                 tokenIndex++;
@@ -406,19 +413,55 @@ public class Eden {
     }
 
     static void expectStatement() {
-        String[] legalTokens = new String[]{"~"};
-        Optional<String> tokenValue = expectTokensOrEmpty(legalTokens);
+        List<String> legalStatementTokens = getLocalVarNamesFromSymbolTable();
+        String[] legalTokens = new String[]{"~", "string", "bool", "int"};
+        legalStatementTokens.addAll(Arrays.asList(legalTokens));
+        Optional<String> tokenValue = expectTokensOrEmpty(legalStatementTokens.toArray(legalTokens));
         assert tokenValue.isPresent();
-        switch (tokenValue.get()) {
+        String tValue = tokenValue.get();
+        switch (tValue) {
             case "~": {
                 expectPrintStatement();
                 break;
             }
+            case "int":
+            case "bool":
+            case "string": {
+                expectLocalVarDeclaration(tValue);
+                break;
+            }
             default: {
+                if (tValue.startsWith("Eden_")) {
+                    expectLocalVarInit(tValue);
+                    break;
+                }
                 printErrToken(tokenList.get(tokenIndex), "Unknown statement");
             }
         }
         expectTokenType(TokenType.SEMICOLON);
+    }
+
+    static void expectLocalVarDeclaration(String varType) {
+        Optional<String> localVarName = expectSymbol();
+        assert localVarName.isPresent();
+        symbolTable.add(new SymbolTableElem(localVarName.get(), varType, ElemKind.LOCAL, localVarShift, false));
+        if (tokenList.get(tokenIndex).type.equals(TokenType.COMMA)) {
+            tokenIndex++;
+            expectLocalVarDeclaration(varType);
+        }
+    }
+
+    static void expectLocalVarInit(String varName) {
+        SymbolTableElem var = getVarByName(varName);
+        assert var != null;
+        assert var.kind.equals(ElemKind.LOCAL);
+        localVarShift += calculateShift(var.type);
+        var.shift = localVarShift;
+        usedVariables.add(var);
+        OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
+        tokenIndex++; // =
+        expectExpression();
+        intermediateRepresentation.add(opAssign);
     }
 
     static void expectPrintStatement() {
@@ -431,6 +474,11 @@ public class Eden {
             Token t = tokenList.get(tokenIndex);
             if (t.type.equals(TokenType.STRING)) {
                 intermediateRepresentation.add(new OpPushString(t.value));
+                tokenIndex++;
+            } else if (t.type.equals(TokenType.SYMBOL)) {
+                SymbolTableElem var = getVarByName((String) t.value);
+                assert var != null;
+                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
                 tokenIndex++;
             }
             // TODO
@@ -527,6 +575,14 @@ public class Eden {
         }
     }
 
+    static int calculateShift(String type) {
+        return type.equals("bool") ? 1 : 4;
+    }
+
+    static int getUniqueIndex() {
+        return uniqueIndex++;
+    }
+
     static void printErrToken(Token token, String errMessage) {
         int offset = String.valueOf(token.value).length();
         System.err.printf("ERROR: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, errMessage, token.type, token.value);
@@ -536,6 +592,11 @@ public class Eden {
     static void printErr(String errMessage) {
         System.err.printf("ERROR: %s%n", errMessage);
         System.exit(2);
+    }
+
+    static void printWarnToken(Token token, String warnMessage) {
+        int offset = String.valueOf(token.value).length();
+        System.err.printf("WARN: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, warnMessage.replaceAll("Eden_", ""), token.type, token.value);
     }
 
     interface Op {
@@ -566,6 +627,7 @@ public class Eden {
         public void generate() {
             programCode.append("\n;OpFunc ").append(toString());
             programCode.append("\n").append(name).append(":");
+            programCode.append("\n\tMOV [localPointer], esp");
             programCode.append("\n\tMOV eax, 0");
             programCode.append("\n\tMOV ebx, ").append(localVarCount);
             programCode.append("\n").append(name).append("Init:");
@@ -614,8 +676,61 @@ public class Eden {
         public void generate() {
             String cmpName = "str_" + stringConstants.size();
             stringConstants.add(value);
-            programCode.append("\n;OpPushString: ").append(value).append("");
+            programCode.append("\n;OpPushString: ").append(value);
             programCode.append("\n\tPUSH ").append(cmpName);
+        }
+    }
+
+    static class OpAssign implements Op {
+        private final String name;
+        private final ElemKind kind;
+        private final int shift;
+
+        public OpAssign(String name, ElemKind kind, int shift) {
+            this.name = name;
+            this.kind = kind; // TODO: think, maybe it's unusable
+            this.shift = shift;
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            // Local
+            programCode.append("\n;OpAssign ").append(name).append(":").append(kind.name()).append(":").append(shift);
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tMOV dword [localPointer + ").append(shift).append("], eax");
+        }
+    }
+
+    static class OpPushVar implements Op {
+        private final String name;
+        private final int shift;
+        private final ElemKind kind;
+
+        public OpPushVar(String name, ElemKind kind, int shift) {
+            this.name = name;
+            this.kind = kind;
+            this.shift = shift;
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPushVar ").append(name).append(":").append(kind.name()).append(":").append(shift);
+            switch (kind) {
+                case LOCAL: {
+                    programCode.append("\n\tPUSH dword [localPointer +").append(shift).append("]");
+                } break;
+                default: throw new NotImplementedException();
+            }
         }
     }
 
@@ -631,15 +746,53 @@ public class Eden {
         String name;
         String type;
         ElemKind kind;
-        int index;
-        boolean isRoutine = false;
+        int shift;
+        boolean isRoutine;
+        Token token;
 
-        public SymbolTableElem(String name, String type, ElemKind kind, int index, boolean isRoutine) {
+        public SymbolTableElem(String name, String type, ElemKind kind, int shift, boolean isRoutine) {
             this.name = name;
             this.type = type;
             this.kind = kind;
-            this.index = index;
+            this.shift = shift;
             this.isRoutine = isRoutine;
+            this.token = tokenList.get(tokenIndex - 1);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) return false;
+            SymbolTableElem o = (SymbolTableElem) obj;
+            return this.name.equals(o.name) && this.type.equals(o.type) && this.kind.equals(o.kind) && this.shift == o.shift && this.isRoutine == o.isRoutine;
+        }
+    }
+
+    static List<String> getLocalVarNamesFromSymbolTable() {
+        List<String> varNames = new ArrayList<>();
+        for (SymbolTableElem s : symbolTable) {
+            if (s.kind.equals(ElemKind.LOCAL)) {
+                varNames.add(s.name);
+            }
+        }
+        return varNames;
+    }
+
+    static SymbolTableElem getVarByName(String varName) {
+        for (SymbolTableElem s : symbolTable) {
+            if (s.name.equals(varName)) {
+                return s;
+            }
+        }
+        printErr("Undeclared variable: " + varName);
+        return null;
+    }
+
+    static void clearLocalVarsSymbolTable(String classFunName) {
+        symbolTable.removeAll(usedVariables);
+        for (SymbolTableElem e : symbolTable) {
+            if (e.kind.equals(ElemKind.LOCAL)) {
+                printWarnToken(e.token, "Variable is defined, but not used: " + e.name + " in " + classFunName);
+            }
         }
     }
 

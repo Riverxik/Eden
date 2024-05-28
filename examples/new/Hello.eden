@@ -1,6 +1,11 @@
 class Hello {
     func void main() {
         ~ "Hello from Eden!\n";
+        string b, a, s;
+        b = "123";
+        s = "Test\n";
+        ~ b;
+        ~ s;
     }
 //
 //    method int test(bool kek) {
