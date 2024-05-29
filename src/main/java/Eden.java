@@ -444,7 +444,13 @@ public class Eden {
     static void expectLocalVarDeclaration(String varType) {
         Optional<String> localVarName = expectSymbol();
         assert localVarName.isPresent();
-        symbolTable.add(new SymbolTableElem(localVarName.get(), varType, ElemKind.LOCAL, localVarShift, false));
+        String lVarName = localVarName.get();
+        SymbolTableElem existingVar = getVarByName(lVarName);
+        if (existingVar == null) {
+            symbolTable.add(new SymbolTableElem(lVarName, varType, ElemKind.LOCAL, localVarShift, false));
+        } else {
+            printErrToken(tokenList.get(tokenIndex - 1), "Variable already defined in this scope: " + lVarName);
+        }
         if (tokenList.get(tokenIndex).type.equals(TokenType.COMMA)) {
             tokenIndex++;
             expectLocalVarDeclaration(varType);
@@ -453,6 +459,9 @@ public class Eden {
 
     static void expectLocalVarInit(String varName) {
         SymbolTableElem var = getVarByName(varName);
+        if (var == null) {
+            printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + varName);
+        }
         assert var != null;
         assert var.kind.equals(ElemKind.LOCAL);
         localVarShift += calculateShift(var.type);
@@ -477,9 +486,24 @@ public class Eden {
                 tokenIndex++;
             } else if (t.type.equals(TokenType.SYMBOL)) {
                 SymbolTableElem var = getVarByName((String) t.value);
+                if (var == null) {
+                    printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
+                }
                 assert var != null;
                 intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
                 tokenIndex++;
+            } else if (t.type.equals(TokenType.NUMBER)) {
+                intermediateRepresentation.add(new OpPushNumber(t.value));
+                tokenIndex++;
+            } else if (t.type.equals(TokenType.KEYWORD)) {
+                if (t.value.equals("true")) {
+                    intermediateRepresentation.add(new OpPushTrue());
+                } else if (t.value.equals("false")) {
+                    intermediateRepresentation.add(new OpPushFalse());
+                }
+                tokenIndex++;
+            } else {
+                throw new NotImplementedException();
             }
             // TODO
         }
@@ -681,6 +705,53 @@ public class Eden {
         }
     }
 
+    static class OpPushNumber implements Op {
+        private final Object value;
+
+        public OpPushNumber(Object value) {
+            this.value = value;
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPushNumber: ").append(value);
+            programCode.append("\n\tPUSH ").append(value);
+        }
+    }
+
+    static class OpPushTrue implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPushTrue");
+            programCode.append("\n\tPUSH 1");
+        }
+    }
+
+    static class OpPushFalse implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPushFalse");
+            programCode.append("\n\tPUSH 0");
+        }
+    }
+
     static class OpAssign implements Op {
         private final String name;
         private final ElemKind kind;
@@ -783,7 +854,6 @@ public class Eden {
                 return s;
             }
         }
-        printErr("Undeclared variable: " + varName);
         return null;
     }
 

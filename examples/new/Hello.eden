@@ -1,14 +1,11 @@
 class Hello {
     func void main() {
         ~ "Hello from Eden!\n";
-        string b, a, s;
-        b = "123";
-        s = "Test\n";
-        ~ b;
-        ~ s;
+        int a = 3;
+        ~ a;
     }
 //
-//    method int test(bool kek) {
+//    method int test(bool kek ) {
 //        ~ 2 + 3;
 //    }
 //
