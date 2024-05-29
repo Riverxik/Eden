@@ -451,6 +451,9 @@ public class Eden {
         } else {
             printErrToken(tokenList.get(tokenIndex - 1), "Variable already defined in this scope: " + lVarName);
         }
+        if (tokenList.get(tokenIndex).type.equals(TokenType.EQUALS)) {
+            expectLocalVarInit(lVarName);
+        }
         if (tokenList.get(tokenIndex).type.equals(TokenType.COMMA)) {
             tokenIndex++;
             expectLocalVarDeclaration(varType);
@@ -502,6 +505,8 @@ public class Eden {
                     intermediateRepresentation.add(new OpPushFalse());
                 }
                 tokenIndex++;
+            } else if (t.type.equals(TokenType.COMMA)) {
+                break; // For several variables declaration + initialization.
             } else {
                 throw new NotImplementedException();
             }
