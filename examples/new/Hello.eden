@@ -1,11 +1,21 @@
 class Hello {
     func void main() {
-        ~ "Hello from Eden!\n";
-        int a = 3, b;
-        b = 1;
-        ~ a;
-        ~ "\n";
-        ~ b;
+        int a;
+        ~ 1 + - 1;
+        ~ 1 + 2;
+        ~ 5 - 1;
+        ~ 4 / 2;
+        ~ 5 * 4;
+        ~ -(-1);
+        ~ 2 / 2 + 2 * 2;
+        ~ 2 + 2 * 2;
+        ~ (2 + 2) * 2;
+        ~ 1 + 1 + -(-2 * (3 + 1 * (4 / 4)));
+        ~ "\n034220156810";
+//        a = -3;
+//        a = a / -1; // HACK FOR NEGATIVE NUMBERS
+//        ~ "-";
+//        ~ a;
     }
 //
 //    method int test(bool kek ) {

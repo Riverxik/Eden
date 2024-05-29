@@ -186,6 +186,27 @@ public class Eden {
 
     static void writeText(FileWriter fw) throws IOException {
         fw.write("section .text\n");
+        // RetFromLogic
+        fw.write("retFrom:\n");
+        fw.write("\tret\n");
+        // strOrInt
+        fw.write(";In:\n");
+        fw.write(";eax - pointerToFirstVariable\n");
+        fw.write(";ebx - pointerToSecondVariable\n");
+        fw.write(";Out:\n");
+        fw.write(";ecx - 0 - string, 1 - integer\n");
+        fw.write("strOrInt:\n");
+        fw.write("\tcmp eax, 4000000 ;IDK WTF IS THIS, SORRY\n");
+        fw.write("\tjge _strNE\n");
+        fw.write("\t;INTEGER\n");
+        fw.write("\tcmp ebx, 4000000 ; XD\n");
+        fw.write("\tjge _strNE\n");
+        fw.write("\t; TWO INTEGERS\n");
+        fw.write("\tmov ecx, 1\n");
+        fw.write("\tret\n");
+        fw.write("\t_strNE:\n");
+        fw.write("\tmov ecx, 0\n");
+        fw.write("\tret\n");
         // print
         fw.write(";In:\n");
         fw.write(";eax - pointerToMessageToPrint\n");
@@ -222,6 +243,8 @@ public class Eden {
         fw.write(";In:\n");
         fw.write(";eax - number\n");
         fw.write(";ebx - lengthOfNumber\n");
+        fw.write(";Out\n");
+        fw.write(";eax - pointer to the number buffer\n");
         fw.write("printInt:\n");
         fw.write("\tcall numCountLen\n");
         fw.write("\tpush eax\n");
@@ -467,8 +490,10 @@ public class Eden {
         }
         assert var != null;
         assert var.kind.equals(ElemKind.LOCAL);
-        localVarShift += calculateShift(var.type);
-        var.shift = localVarShift;
+        if (var.shift == 0) {
+            localVarShift += calculateShift(var.type);
+            var.shift = localVarShift;
+        }
         usedVariables.add(var);
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
         tokenIndex++; // =
@@ -484,34 +509,129 @@ public class Eden {
     static void expectExpression() {
         while (!hasNextTokenValues(";")) {
             Token t = tokenList.get(tokenIndex);
-            if (t.type.equals(TokenType.STRING)) {
-                intermediateRepresentation.add(new OpPushString(t.value));
-                tokenIndex++;
-            } else if (t.type.equals(TokenType.SYMBOL)) {
-                SymbolTableElem var = getVarByName((String) t.value);
-                if (var == null) {
-                    printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
-                }
-                assert var != null;
-                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
-                tokenIndex++;
-            } else if (t.type.equals(TokenType.NUMBER)) {
-                intermediateRepresentation.add(new OpPushNumber(t.value));
-                tokenIndex++;
-            } else if (t.type.equals(TokenType.KEYWORD)) {
-                if (t.value.equals("true")) {
-                    intermediateRepresentation.add(new OpPushTrue());
-                } else if (t.value.equals("false")) {
-                    intermediateRepresentation.add(new OpPushFalse());
-                }
-                tokenIndex++;
-            } else if (t.type.equals(TokenType.COMMA)) {
+            if (t.type.equals(TokenType.COMMA) || t.type.equals(TokenType.CLOSE_BRACKET)) {
                 break; // For several variables declaration + initialization.
-            } else {
-                throw new NotImplementedException();
             }
-            // TODO
+            part();
+            sum();
+//            logical();
         }
+    }
+
+    static void sum() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.PLUS)) {
+            tokenIndex++;
+            part();
+            intermediateRepresentation.add(new OpPlus());
+            sum();
+        }
+        if (t.type.equals(TokenType.MINUS)) {
+            tokenIndex++;
+            part();
+            intermediateRepresentation.add(new OpMinus());
+            sum();
+        }
+    }
+
+//    static void logical() {
+//        Token t = tokenList.get(tokenIndex);
+//        if (t.type.equals(TokenType.GREATER)) {
+//            tokenIndex++;
+//            part();
+//            sum();
+//            intermediateRepresentation.add(new OpMore());
+//        }
+//        if (t.type.equals(TokenType.LESS)) {
+//            tokenIndex++;
+//            part();
+//            sum();
+//            intermediateRepresentation.add(new OpLess());
+//        }
+//        if (t.type.equals(TokenType.EQUALS)) {
+//            tokenIndex++;
+//            part();
+//            sum();
+//            intermediateRepresentation.add(new OpEqual());
+//        }
+//    }
+
+    static void part() {
+        unary();
+    }
+
+    static void unary() {
+        boolean isPositive = true;
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.PLUS) || t.type.equals(TokenType.MINUS)) {
+            if (t.type.equals(TokenType.MINUS)) {
+                isPositive = false;
+            }
+            tokenIndex++;
+        }
+        arg(isPositive);
+        starSlash();
+    }
+
+    static void starSlash() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.MULTIPLY)) {
+            tokenIndex++;
+            unary();
+            intermediateRepresentation.add(new OpMultiply());
+            starSlash();
+        }
+        if (t.type.equals(TokenType.DIVIDE)) {
+            tokenIndex++;
+            unary();
+            intermediateRepresentation.add(new OpDivide());
+            starSlash();
+        }
+        /* TODO: ^ op?
+        if (String.valueOf(current.value).equalsIgnoreCase("^")) {
+            opPower();
+            starSlash();
+        }
+        */
+    }
+
+    static void arg(boolean isPositive) {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.STRING)) {
+            intermediateRepresentation.add(new OpPushString(t.value));
+            tokenIndex++;
+        } else if (t.type.equals(TokenType.OPEN_BRACKET)) {
+            tokenIndex++;
+            expectExpression();
+            t = tokenList.get(tokenIndex);
+            if (t.type.equals(TokenType.CLOSE_BRACKET)) {
+                tokenIndex++;
+                if (!isPositive) {
+                    intermediateRepresentation.add(new OpNeg());
+                }
+            } else {
+                printErrToken(t, "Expected close bracket, but found");
+            }
+        } else if (t.type.equals(TokenType.SYMBOL)) {
+            SymbolTableElem var = getVarByName((String) t.value);
+            if (var == null) {
+                printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
+            }
+            assert var != null;
+            intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
+            tokenIndex++;
+        } else if (t.type.equals(TokenType.NUMBER)) {
+            intermediateRepresentation.add(new OpPushNumber(t.value, isPositive));
+            tokenIndex++;
+        } else if (t.type.equals(TokenType.KEYWORD)) {
+            if (t.value.equals("true")) {
+                intermediateRepresentation.add(new OpPushTrue());
+            } else if (t.value.equals("false")) {
+                intermediateRepresentation.add(new OpPushFalse());
+            }
+            tokenIndex++;
+        }
+        // TODO
     }
 
     static EdenType expectType(String... types) {
@@ -712,9 +832,11 @@ public class Eden {
 
     static class OpPushNumber implements Op {
         private final Object value;
+        private final boolean isPositive;
 
-        public OpPushNumber(Object value) {
+        public OpPushNumber(Object value, boolean isPositive) {
             this.value = value;
+            this.isPositive = isPositive;
         }
 
         @Override
@@ -725,7 +847,109 @@ public class Eden {
         @Override
         public void generate() {
             programCode.append("\n;OpPushNumber: ").append(value);
-            programCode.append("\n\tPUSH ").append(value);
+            if (isPositive) {
+                programCode.append("\n\tPUSH ").append(value);
+            } else {
+                programCode.append("\n\tPUSH -").append(value);
+            }
+        }
+    }
+
+    static class OpNeg implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpNeg: ");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tNEG eax");
+            programCode.append("\n\tPUSH eax");
+        }
+    }
+
+    static class OpPlus implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpPlus");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCALL strOrInt");
+            programCode.append("\n\tCMP ecx, 0");
+            programCode.append("\n\tJE retFrom"); // If 0 then String, no support for now
+            programCode.append("\n\tADD eax, ebx");
+            programCode.append("\n\tPUSH eax");
+        }
+    }
+
+    static class OpMinus implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpMinus");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCALL strOrInt");
+            programCode.append("\n\tCMP ecx, 0");
+            programCode.append("\n\tJE retFrom"); // If 0 then String, no support for now
+            programCode.append("\n\tSUB eax, ebx");
+            programCode.append("\n\tPUSH eax");
+        }
+    }
+
+    static class OpMultiply implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpMultiply");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCALL strOrInt");
+            programCode.append("\n\tCMP ecx, 0");
+            programCode.append("\n\tJE retFrom"); // If 0 then String, no support for now
+            programCode.append("\n\tIMUL eax, ebx");
+            programCode.append("\n\tPUSH eax");
+        }
+    }
+
+    static class OpDivide implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpDivide");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCALL strOrInt");
+            programCode.append("\n\tCMP ecx, 0");
+            programCode.append("\n\tJE retFrom"); // If 0 then String, no support for now
+            programCode.append("\n\tXOR edx, edx");
+            programCode.append("\n\tCDQ");
+            programCode.append("\n\tIDIV ebx");
+            programCode.append("\n\tPUSH eax");
         }
     }
 
