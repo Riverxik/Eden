@@ -569,7 +569,10 @@ public class Eden {
             }
             tokenIndex++;
         }
-        arg(isPositive);
+        arg();
+        if (!isPositive) {
+            intermediateRepresentation.add(new OpNeg());
+        }
         starSlash();
     }
 
@@ -595,7 +598,7 @@ public class Eden {
         */
     }
 
-    static void arg(boolean isPositive) {
+    static void arg() {
         Token t = tokenList.get(tokenIndex);
         if (t.type.equals(TokenType.STRING)) {
             intermediateRepresentation.add(new OpPushString(t.value));
@@ -606,9 +609,6 @@ public class Eden {
             t = tokenList.get(tokenIndex);
             if (t.type.equals(TokenType.CLOSE_BRACKET)) {
                 tokenIndex++;
-                if (!isPositive) {
-                    intermediateRepresentation.add(new OpNeg());
-                }
             } else {
                 printErrToken(t, "Expected close bracket, but found");
             }
@@ -621,7 +621,7 @@ public class Eden {
             intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
             tokenIndex++;
         } else if (t.type.equals(TokenType.NUMBER)) {
-            intermediateRepresentation.add(new OpPushNumber(t.value, isPositive));
+            intermediateRepresentation.add(new OpPushNumber(t.value));
             tokenIndex++;
         } else if (t.type.equals(TokenType.KEYWORD)) {
             if (t.value.equals("true")) {
@@ -832,11 +832,9 @@ public class Eden {
 
     static class OpPushNumber implements Op {
         private final Object value;
-        private final boolean isPositive;
 
-        public OpPushNumber(Object value, boolean isPositive) {
+        public OpPushNumber(Object value) {
             this.value = value;
-            this.isPositive = isPositive;
         }
 
         @Override
@@ -847,11 +845,7 @@ public class Eden {
         @Override
         public void generate() {
             programCode.append("\n;OpPushNumber: ").append(value);
-            if (isPositive) {
-                programCode.append("\n\tPUSH ").append(value);
-            } else {
-                programCode.append("\n\tPUSH -").append(value);
-            }
+            programCode.append("\n\tPUSH ").append(value);
         }
     }
 
