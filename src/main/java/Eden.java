@@ -26,6 +26,8 @@ public class Eden {
     static List<SymbolTableElem> symbolTable = new ArrayList<>();
     static int localVarShift = 0;
     static List<SymbolTableElem> usedVariables = new ArrayList<>();
+    static List<String> subroutineNames = new ArrayList<>();
+    static String mainFuncName;
     static int uniqueIndex = 0;
     static byte[] Memory = new byte[MAX_INTERPRET_MEMORY_SIZE];
     static boolean isInterpreter = true;
@@ -129,7 +131,6 @@ public class Eden {
             writeVariables(fw);
             writeText(fw);
             fw.write(programCode.toString());
-            fw.write("\n\tcall exit\n");
             fw.flush();
             fw.close();
         } catch (IOException e) {
@@ -163,7 +164,6 @@ public class Eden {
         fw.write("\tStdHandle resd 1\n");
         fw.write("\tdigitBuffer resb 100\n");
         fw.write("\tdigitBufferPos resb 8\n");
-        fw.write("\tlocalPointer resd 1\n");
 //        for (SymbolTableElem var : usedVariables) {
 //            switch (var.type) {
 //                case "string":
@@ -294,9 +294,17 @@ public class Eden {
         // Start
         fw.write("Start:\n");
         fw.write("\t;Get the console handler\n");
+        fw.write("\tpush ebp\n");
+        fw.write("\tmov ebp, esp\n");
+        fw.write("\tsub esp, 10\n");
+        fw.write("\t\n");
         fw.write("\tpush -11\n");
         fw.write("\tcall GetStdHandle\n");
         fw.write("\tmov dword [StdHandle], eax\n");
+        fw.write("\tcall " + mainFuncName + "\n");
+        fw.write("\tmov esp, ebp\n");
+        fw.write("\tpop ebp\n");
+        fw.write("\tjmp exit\n");
     }
 
 //    @Deprecated
@@ -344,6 +352,21 @@ public class Eden {
 
     static void parse() {
         parseClass();
+        checkForMainFunc();
+    }
+
+    static void checkForMainFunc() {
+        boolean isMain = false;
+        for (String name : subroutineNames) {
+            if (name.split("[.]")[1].equals("Eden_main")) {
+                isMain = true;
+                mainFuncName = name;
+                break;
+            }
+        }
+        if (!isMain) {
+            printErr("Valid Eden program must have entry point function main()");
+        }
     }
 
     static void parseClass() {
@@ -390,13 +413,19 @@ public class Eden {
         EdenType type = expectType("void", "int");
         Optional<String> rawName = expectSymbol();
         assert rawName.isPresent();
-        String name = rawName.get();
-        int count = expectParametersDec();
-        OpFunc func = new OpFunc(currentClassName+"."+name, type.name(), count);
+        String name = currentClassName + "." + rawName.get();
+        if (!subroutineNames.contains(name)) {
+            subroutineNames.add(name);
+        } else {
+            printErrToken(tokenList.get(tokenIndex - 1), "Already defined in this scope: ");
+        }
+        int countArgs = expectParametersDec();
+        OpFunc func = new OpFunc(name, type.name(), countArgs);
         localVarShift = 0;
         intermediateRepresentation.add(func);
-        expectBlockStatement();
-        clearLocalVarsSymbolTable(currentClassName+"."+name);
+        func.localVarCount = expectBlockStatement();
+        clearLocalVarsSymbolTable(name);
+        checkForReturn(type, name);
     }
 
     static void expectConstructor() {
@@ -405,6 +434,74 @@ public class Eden {
 
     static void expectMethod() {
         // TODO
+    }
+
+    static void checkForReturn(EdenType type, String name) {
+        Op lastOp = intermediateRepresentation.get(intermediateRepresentation.size() - 1);
+        if (!(lastOp instanceof OpReturn)) {
+            if (type.equals(EdenType.VOID)) {
+                intermediateRepresentation.add(new OpReturn());
+            } else {
+                printErrToken(tokenList.get(tokenIndex - 1), "Missing return statement " + name.replaceAll("Eden_", ""));
+            }
+        }
+    }
+
+    static boolean checkForFuncCall() {
+        return hasNextTokenValues(".", "(");
+    }
+
+    static void expectFuncCall(String identifierName) {
+        String callName;
+        int nArgs = 0;
+        if (hasNextTokenValues(".")) {
+            expectTokenType(TokenType.DOT); // . for member func call
+            String subName = expectSymbol().get();
+            try {
+                // a.calc();
+                SymbolTableElem var = getVarByName(identifierName);
+                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
+                nArgs++;
+                callName = var.type + "." + subName;
+            } catch (RuntimeException ignored) {
+                // Math.sqrt();
+                callName = identifierName + "." + subName;
+            }
+        } else {
+            // sqrt(); // Assume that in this case func sqrt belongs to the current class
+            callName = currentClassName + "." + identifierName;
+        }
+        expectTokenType(TokenType.OPEN_BRACKET);
+        nArgs += expectExpressionList();
+        expectTokenType(TokenType.CLOSE_BRACKET);
+        if (nArgs != 0) {
+            List<Op> tmpList = new ArrayList<>();
+            for (int i = intermediateRepresentation.size() - 1, c = 0; c < nArgs; c++, i--) {
+                tmpList.add(intermediateRepresentation.get(i));
+                intermediateRepresentation.remove(i);
+            }
+            intermediateRepresentation.addAll(tmpList);
+        }
+        intermediateRepresentation.add(new OpCall(callName, nArgs));
+        // pop temp?
+    }
+
+    static int expectExpressionList() {
+        if (hasNextTokenValues(")")) {
+            return 0;
+        }
+        int count = 1;
+        expectExpression();
+        while (!hasNextTokenValues(")")) {
+            if (hasNextTokenValues(",")) {
+                expectTokenType(TokenType.COMMA);
+                expectExpression();
+                count++;
+            } else {
+                printErr("Expected expression list, but found EOF");
+            }
+        }
+        return count;
     }
 
     static int expectParametersDec() {
@@ -427,21 +524,19 @@ public class Eden {
         return count;
     }
 
-    static void expectBlockStatement() {
+    static int expectBlockStatement() {
         expectTokenType(TokenType.OPEN_CURLY_BRACKET);
+        int localVarCount = 0;
         while (!hasNextTokenValues("}")) {
-            expectStatement();
+            localVarCount += expectStatement();
         }
         expectTokenType(TokenType.CLOSE_CURLY_BRACKET);
+        return localVarCount;
     }
 
-    static void expectStatement() {
-        List<String> legalStatementTokens = getLocalVarNamesFromSymbolTable();
-        String[] legalTokens = new String[]{"~", "string", "bool", "int"};
-        legalStatementTokens.addAll(Arrays.asList(legalTokens));
-        Optional<String> tokenValue = expectTokensOrEmpty(legalStatementTokens.toArray(legalTokens));
-        assert tokenValue.isPresent();
-        String tValue = tokenValue.get();
+    static int expectStatement() {
+        int localVarCount = 0;
+        String tValue = String.valueOf(tokenList.get(tokenIndex++).value);
         switch (tValue) {
             case "~": {
                 expectPrintStatement();
@@ -451,17 +546,23 @@ public class Eden {
             case "bool":
             case "string": {
                 expectLocalVarDeclaration(tValue);
+                localVarCount++;
                 break;
             }
             default: {
                 if (tValue.startsWith("Eden_")) {
-                    expectLocalVarInit(tValue);
+                    if (checkForFuncCall()) {
+                        expectFuncCall(tValue);
+                    } else {
+                        expectLocalVarInit(tValue);
+                    }
                     break;
                 }
                 printErrToken(tokenList.get(tokenIndex), "Unknown statement");
             }
         }
         expectTokenType(TokenType.SEMICOLON);
+        return localVarCount;
     }
 
     static void expectLocalVarDeclaration(String varType) {
@@ -507,7 +608,7 @@ public class Eden {
     }
 
     static void expectExpression() {
-        while (!hasNextTokenValues(";")) {
+        while (!hasNextTokenValues(";", "}")) {
             Token t = tokenList.get(tokenIndex);
             if (t.type.equals(TokenType.COMMA) || t.type.equals(TokenType.CLOSE_BRACKET)) {
                 break; // For several variables declaration + initialization.
@@ -748,6 +849,10 @@ public class Eden {
         System.err.printf("WARN: [%d:%d] %s: (%s)'%s'%n", token.loc.line + 1, token.loc.column - offset, warnMessage.replaceAll("Eden_", ""), token.type, token.value);
     }
 
+    static void printWarn(String warnMessage) {
+        System.err.printf("WARN: %s%n", warnMessage);
+    }
+
     interface Op {
         void interpret();
         void generate();
@@ -757,14 +862,15 @@ public class Eden {
     static class OpFunc implements Op {
         private final String name;
         private final String type;
-        private final int localVarCount;
+        private final int argsCount;
+        private int localVarCount = 0;
         private final boolean isMain;
 
-        public OpFunc(String name, String type, int localVarCount) {
+        public OpFunc(String name, String type, int argsCount) {
             this.name = name;
             this.type = type;
-            this.localVarCount = localVarCount;
-            this.isMain = name.equals("main");
+            this.argsCount = argsCount;
+            this.isMain = name.split("[.]")[1].equals("Eden_main");
         }
 
         @Override
@@ -774,16 +880,23 @@ public class Eden {
 
         @Override
         public void generate() {
+            if (!validateFuncHasBeenUsed()) {
+                return;
+            }
             programCode.append("\n;OpFunc ").append(toString());
             programCode.append("\n").append(name).append(":");
-            programCode.append("\n\tMOV [localPointer], esp");
-            programCode.append("\n\tMOV eax, 0");
+            // Saving context
+            programCode.append("\n\tPUSH ebp");
+            programCode.append("\n\tMOV ebp, esp");
+            programCode.append("\n\tSUB esp, ").append(4*localVarCount);
+
+            programCode.append("\n\tMOV ecx, 0");
             programCode.append("\n\tMOV ebx, ").append(localVarCount);
             programCode.append("\n").append(name).append("Init:");
-            programCode.append("\n\tCMP eax, ebx");
+            programCode.append("\n\tCMP ecx, ebx");
             programCode.append("\n\tJE ").append(name).append("Body");
             programCode.append("\n\tPUSH 0");
-            programCode.append("\n\tINC eax");
+            programCode.append("\n\tINC ecx");
             programCode.append("\n\tJMP ").append(name).append("Init");
             programCode.append("\n").append(name).append("Body:");
         }
@@ -791,6 +904,104 @@ public class Eden {
         @Override
         public String toString() {
             return String.format("Name: %s, type: %s, localVarCount: %d", name, type, localVarCount);
+        }
+
+        private boolean validateFuncHasBeenUsed() {
+            if (name.equals(mainFuncName)) {
+                return true;
+            }
+            for (Op op : intermediateRepresentation) {
+                if (!(op instanceof OpCall)) {
+                    continue;
+                }
+                OpCall call = (OpCall) op;
+                if (!call.getCallName().equals(name)) {
+                    continue;
+                }
+                return true;
+            }
+            printWarn("Function is defined, but not used: " + name);
+            return false;
+        }
+
+        public String getName() {
+            return this.name;
+        }
+
+        public int getArgCount() {
+            return this.argsCount;
+        }
+    }
+
+    static class OpCall implements Op {
+
+        private final String callName;
+        private final int nArgs;
+
+        public OpCall(String callName, int nArgs) {
+            this.callName = callName;
+            this.nArgs = nArgs;
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            validateDeclaration();
+            validateGivenArgs();
+            programCode.append("\n;OpCall ").append(callName).append(" - ").append(nArgs);
+            programCode.append("\n\tCALL ").append(callName);
+            programCode.append("\n\tPOP edx");
+        }
+
+        private void validateDeclaration() {
+            for (Op op : intermediateRepresentation) {
+                if (op instanceof OpFunc) {
+                    if (((OpFunc) op).getName().equals(callName)) {
+                        return;
+                    }
+                }
+            }
+            printErr("There is a call for subroutine, but no declaration: " + callName.replaceAll("Eden_", ""));
+        }
+
+        private void validateGivenArgs() {
+            for (Op op : intermediateRepresentation) {
+                if (!(op instanceof OpFunc)) {
+                    continue;
+                }
+                OpFunc func = (OpFunc) op;
+                if (!func.getName().equals(callName)) {
+                    continue;
+                }
+                if (func.getArgCount() == nArgs) {
+                    break;
+                }
+                printErr(String.format("For function '%s' was expected %d arguments, but given %d", callName.replaceAll("Eden_", ""), func.argsCount, nArgs));
+            }
+        }
+
+        public String getCallName() {
+            return callName;
+        }
+    }
+
+    static class OpReturn implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpReturn");
+            programCode.append("\n\tMOV esp, ebp");
+            programCode.append("\n\tPOP ebp");
+            programCode.append("\n\tRET");
         }
     }
 
@@ -996,7 +1207,7 @@ public class Eden {
             // Local
             programCode.append("\n;OpAssign ").append(name).append(":").append(kind.name()).append(":").append(shift);
             programCode.append("\n\tPOP eax");
-            programCode.append("\n\tMOV dword [localPointer + ").append(shift).append("], eax");
+            programCode.append("\n\tMOV dword [ebp - ").append(shift).append("], eax");
         }
     }
 
@@ -1021,7 +1232,10 @@ public class Eden {
             programCode.append("\n;OpPushVar ").append(name).append(":").append(kind.name()).append(":").append(shift);
             switch (kind) {
                 case LOCAL: {
-                    programCode.append("\n\tPUSH dword [localPointer +").append(shift).append("]");
+                    programCode.append("\n\tPUSH dword [ebp - ").append(shift).append("]");
+                } break;
+                case ARGUMENT: {
+                    programCode.append("\n\tPUSH dword [ebp + ").append(4 + shift).append("]");
                 } break;
                 default: throw new NotImplementedException();
             }
@@ -1061,6 +1275,7 @@ public class Eden {
         }
     }
 
+    @Deprecated
     static List<String> getLocalVarNamesFromSymbolTable() {
         List<String> varNames = new ArrayList<>();
         for (SymbolTableElem s : symbolTable) {
@@ -1082,11 +1297,14 @@ public class Eden {
 
     static void clearLocalVarsSymbolTable(String classFunName) {
         symbolTable.removeAll(usedVariables);
+        List<SymbolTableElem> toRemove = new ArrayList<>();
         for (SymbolTableElem e : symbolTable) {
             if (e.kind.equals(ElemKind.LOCAL)) {
                 printWarnToken(e.token, "Variable is defined, but not used: " + e.name + " in " + classFunName);
+                toRemove.add(e);
             }
         }
+        symbolTable.removeAll(toRemove);
     }
 
     enum EdenType {
@@ -1099,6 +1317,7 @@ public class Eden {
         //CHARACTER,
         SEMICOLON,
         COMMA,
+        DOT,
         WIN_CALL_SYMBOL,
         OPEN_BRACKET,
         CLOSE_BRACKET,
@@ -1444,7 +1663,10 @@ public class Eden {
                     tokenList.add(new Token(TokenType.COMMA, currentChar, new Location(line, column)));
                     break;
                 }
-                case '.': break;
+                case '.': {
+                    tokenList.add(new Token(TokenType.DOT, currentChar, new Location(line, column)));
+                    break;
+                }
                 case ':': {
                     tokenList.add(new Token(TokenType.WIN_CALL_SYMBOL, currentChar, new Location(line, column)));
                     break;

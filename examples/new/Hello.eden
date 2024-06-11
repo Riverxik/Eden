@@ -1,22 +1,24 @@
 class Hello {
+
     func void main() {
-        int a;
-//        ~ 1 + - 1;
-//        ~ 1 + 2;
-//        ~ 5 - 1;
-//        ~ 4 / 2;
-//        ~ 5 * 4;
-//        ~ -(-1);
-//        ~ 2 / 2 + 2 * 2;
-//        ~ 2 + 2 * 2;
-//        ~ (2 + 2) * 2;
-//        ~ 1 + 1 + -(-2 * (3 + 1 * (4 / 4)));
-//        ~ "\n034220156810";
-        a = -3 * 2;
-        a = -a ; // HACK FOR NEGATIVE NUMBERS
-        ~ "-";
-        ~ a;
+//        Point b;
+//        a = b.getInt();
+//        b.print();
+        ~ "Test: ";
+        Hello.printSix(4, 3);
     }
+
+    func void printSix(int b, int c) {
+        int a, d;
+//        int a;
+        a = 6 + b - c;
+        ~ a; ~ "\n";
+    }
+
+    func void unused() {
+        ~ "Hello";
+    }
+
 //
 //    method int test(bool kek ) {
 //        ~ 2 + 3;
