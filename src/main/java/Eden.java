@@ -410,7 +410,7 @@ public class Eden {
     }
 
     static void expectFunc() {
-        EdenType type = expectType("void", "int");
+        EdenType type = expectType("void", "int", "bool");
         Optional<String> rawName = expectSymbol();
         assert rawName.isPresent();
         String name = currentClassName + "." + rawName.get();
@@ -549,6 +549,10 @@ public class Eden {
                 localVarCount++;
                 break;
             }
+            case "Eden_return": {
+                expectReturnStatement();
+                break;
+            }
             default: {
                 if (tValue.startsWith("Eden_")) {
                     if (checkForFuncCall()) {
@@ -563,6 +567,11 @@ public class Eden {
         }
         expectTokenType(TokenType.SEMICOLON);
         return localVarCount;
+    }
+
+    static void expectReturnStatement() {
+        expectExpression();
+        intermediateRepresentation.add(new OpReturn());
     }
 
     static void expectLocalVarDeclaration(String varType) {
@@ -714,13 +723,22 @@ public class Eden {
                 printErrToken(t, "Expected close bracket, but found");
             }
         } else if (t.type.equals(TokenType.SYMBOL)) {
-            SymbolTableElem var = getVarByName((String) t.value);
-            if (var == null) {
-                printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
+            // Array
+            // Subroutine call
+            Token next = tokenList.get(tokenIndex + 1);
+            if (next.type == TokenType.DOT || next.type == TokenType.OPEN_BRACKET) {
+                tokenIndex++;
+                expectFuncCall(String.valueOf(t.value));
+            } else {
+                // Variable
+                SymbolTableElem var = getVarByName((String) t.value);
+                if (var == null) {
+                    printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
+                }
+                assert var != null;
+                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
+                tokenIndex++;
             }
-            assert var != null;
-            intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
-            tokenIndex++;
         } else if (t.type.equals(TokenType.NUMBER)) {
             intermediateRepresentation.add(new OpPushNumber(t.value));
             tokenIndex++;
@@ -888,17 +906,19 @@ public class Eden {
             // Saving context
             programCode.append("\n\tPUSH ebp");
             programCode.append("\n\tMOV ebp, esp");
-            programCode.append("\n\tSUB esp, ").append(4*localVarCount);
+            if (localVarCount != 0) {
+                programCode.append("\n\tSUB esp, ").append(4*localVarCount);
+                /*programCode.append("\n\tMOV ecx, 0");
+                programCode.append("\n\tMOV ebx, ").append(localVarCount);
+                programCode.append("\n").append(name).append("Init:");
+                programCode.append("\n\tCMP ecx, ebx");
+                programCode.append("\n\tJE ").append(name).append("Body");
+                programCode.append("\n\tPUSH 0");
+                programCode.append("\n\tINC ecx");
+                programCode.append("\n\tJMP ").append(name).append("Init");
+                programCode.append("\n").append(name).append("Body:");*/
+            }
 
-            programCode.append("\n\tMOV ecx, 0");
-            programCode.append("\n\tMOV ebx, ").append(localVarCount);
-            programCode.append("\n").append(name).append("Init:");
-            programCode.append("\n\tCMP ecx, ebx");
-            programCode.append("\n\tJE ").append(name).append("Body");
-            programCode.append("\n\tPUSH 0");
-            programCode.append("\n\tINC ecx");
-            programCode.append("\n\tJMP ").append(name).append("Init");
-            programCode.append("\n").append(name).append("Body:");
         }
 
         @Override
@@ -920,7 +940,7 @@ public class Eden {
                 }
                 return true;
             }
-            printWarn("Function is defined, but not used: " + name);
+            printWarn("Function is defined, but not used: " + name.replaceAll("Eden_", ""));
             return false;
         }
 
@@ -930,6 +950,10 @@ public class Eden {
 
         public int getArgCount() {
             return this.argsCount;
+        }
+
+        public String getType() {
+            return type;
         }
     }
 
@@ -950,22 +974,31 @@ public class Eden {
 
         @Override
         public void generate() {
-            validateDeclaration();
+            EdenType type = validateDeclaration();
             validateGivenArgs();
             programCode.append("\n;OpCall ").append(callName).append(" - ").append(nArgs);
             programCode.append("\n\tCALL ").append(callName);
-            programCode.append("\n\tPOP edx");
+            if (nArgs > 0) {
+                for (int i = 0; i < nArgs; i++) {
+                    programCode.append("\n\tPOP edx");
+                }
+            }
+            if (!type.equals(EdenType.VOID)) {
+                programCode.append("\n\tPUSH eax");
+            }
         }
 
-        private void validateDeclaration() {
+        private EdenType validateDeclaration() {
             for (Op op : intermediateRepresentation) {
                 if (op instanceof OpFunc) {
-                    if (((OpFunc) op).getName().equals(callName)) {
-                        return;
+                    OpFunc func = (OpFunc) op;
+                    if (func.getName().equals(callName)) {
+                        return EdenType.valueOf(func.getType());
                     }
                 }
             }
             printErr("There is a call for subroutine, but no declaration: " + callName.replaceAll("Eden_", ""));
+            return EdenType.VOID;
         }
 
         private void validateGivenArgs() {
@@ -998,10 +1031,61 @@ public class Eden {
 
         @Override
         public void generate() {
+            boolean isVoid = validateReturnType();
             programCode.append("\n;OpReturn");
-            programCode.append("\n\tMOV esp, ebp");
-            programCode.append("\n\tPOP ebp");
-            programCode.append("\n\tRET");
+            if (isVoid) {
+                programCode.append("\n\tMOV esp, ebp");
+                programCode.append("\n\tPOP ebp");
+                programCode.append("\n\tRET");
+            } else {
+                programCode.append("\n\tPOP eax");
+                programCode.append("\n\tMOV esp, ebp");
+                programCode.append("\n\tPOP ebp");
+                programCode.append("\n\tRET");
+            }
+        }
+
+        private boolean validateReturnType() {
+            int index = intermediateRepresentation.indexOf(this);
+            for (int i = index; i >= 0; i--) {
+                Op op = intermediateRepresentation.get(i);
+                if (!(op instanceof OpFunc)) {
+                    continue;
+                }
+                OpFunc func = (OpFunc) op;
+                EdenType funcType = EdenType.valueOf(func.getType());
+                Op prevOp = intermediateRepresentation.get(index - 1);
+                switch (funcType) {
+                    // TODO: Не совсем корректно определяется тип (нужна полноценная система проверки типов)
+                    case INT: {
+                        if (!(prevOp instanceof OpPushNumber) && !(prevOp instanceof OpPushVar)
+                                && !(prevOp instanceof OpPlus) && !(prevOp instanceof OpMinus)
+                                && !(prevOp instanceof OpMultiply) && !(prevOp instanceof OpDivide)
+                                && !(prevOp instanceof OpNeg)
+                        ) {
+                            printErr(String.format("Function %s must return integer", func.getName().replaceAll("Eden_", "")));
+                        }
+                    } break;
+                    case BOOL: {
+                        if (!(prevOp instanceof OpPushTrue) && !(prevOp instanceof OpPushFalse)) {
+                            printErr(String.format("Function %s must return bool", func.getName().replaceAll("Eden_", "")));
+                        }
+                    } break;
+                    case VOID: {
+                        if (prevOp instanceof OpPushVar || prevOp instanceof OpPushNumber
+                                || prevOp instanceof OpPushTrue || prevOp instanceof OpPushFalse
+                                || prevOp instanceof OpPushString) {
+                            printErr(String.format("Function %s must return void", func.getName().replaceAll("Eden_", "")));
+                        }
+                        return true;
+                    }
+                    default: {
+                        printErr("Unexpected function return");
+                    }
+                }
+                break;
+            }
+            return false;
         }
     }
 

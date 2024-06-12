@@ -6,17 +6,21 @@ class Hello {
 //        b.print();
         ~ "Test: ";
         Hello.printSix(4, 3);
+        ~ retBool();
     }
 
     func void printSix(int b, int c) {
-        int a, d;
-//        int a;
-        a = 6 + b - c;
+        int a = 6 + b - c + unused();
         ~ a; ~ "\n";
     }
 
-    func void unused() {
-        ~ "Hello";
+    func int unused() {
+        ~ "Hello: ";
+        return 1 + (2 * 2);
+    }
+
+    func bool retBool() {
+        return true;
     }
 
 //
