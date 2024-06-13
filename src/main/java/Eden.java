@@ -447,8 +447,28 @@ public class Eden {
         }
     }
 
+    static boolean checkForArray() {
+        return hasNextTokenValues("[");
+    }
+
     static boolean checkForFuncCall() {
         return hasNextTokenValues(".", "(");
+    }
+
+    static void expectArray(String identifierName) {
+        SymbolTableElem var = getVarByName(identifierName);
+        if (var == null) {
+            printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + identifierName);
+        }
+        assert var != null;
+        assert var.shift != 0;
+        tokenIndex++; // [
+        expectExpression();
+        tokenIndex++;
+        OpAssign opAssign = new OpAssign(identifierName, var.kind, var.shift, true);
+        tokenIndex++; // =
+        expectExpression();
+        intermediateRepresentation.add(opAssign);
     }
 
     static void expectFuncCall(String identifierName) {
@@ -545,8 +565,7 @@ public class Eden {
             case "int":
             case "bool":
             case "string": {
-                expectLocalVarDeclaration(tValue);
-                localVarCount++;
+                localVarCount = expectLocalVarDeclaration(tValue, localVarCount);
                 break;
             }
             case "Eden_return": {
@@ -555,7 +574,9 @@ public class Eden {
             }
             default: {
                 if (tValue.startsWith("Eden_")) {
-                    if (checkForFuncCall()) {
+                    if (checkForArray()) {
+                        expectArray(tValue);
+                    } else if (checkForFuncCall()) {
                         expectFuncCall(tValue);
                     } else {
                         expectLocalVarInit(tValue);
@@ -574,13 +595,14 @@ public class Eden {
         intermediateRepresentation.add(new OpReturn());
     }
 
-    static void expectLocalVarDeclaration(String varType) {
+    static int expectLocalVarDeclaration(String varType, int localVarCount) {
         Optional<String> localVarName = expectSymbol();
         assert localVarName.isPresent();
         String lVarName = localVarName.get();
         SymbolTableElem existingVar = getVarByName(lVarName);
         if (existingVar == null) {
-            symbolTable.add(new SymbolTableElem(lVarName, varType, ElemKind.LOCAL, localVarShift, false));
+            symbolTable.add(new SymbolTableElem(lVarName, varType, ElemKind.LOCAL, localVarShift++, false));
+            localVarCount++;
         } else {
             printErrToken(tokenList.get(tokenIndex - 1), "Variable already defined in this scope: " + lVarName);
         }
@@ -589,8 +611,9 @@ public class Eden {
         }
         if (tokenList.get(tokenIndex).type.equals(TokenType.COMMA)) {
             tokenIndex++;
-            expectLocalVarDeclaration(varType);
+            return expectLocalVarDeclaration(varType, localVarCount);
         }
+        return localVarCount;
     }
 
     static void expectLocalVarInit(String varName) {
@@ -600,9 +623,10 @@ public class Eden {
         }
         assert var != null;
         assert var.kind.equals(ElemKind.LOCAL);
-        if (var.shift == 0) {
-            localVarShift += calculateShift(var.type);
-            var.shift = localVarShift;
+        if (!var.isInit) {
+            int shift = calculateShift(var.type);
+            var.shift = shift + var.shift * shift;
+            var.isInit = true;
         }
         usedVariables.add(var);
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
@@ -617,7 +641,7 @@ public class Eden {
     }
 
     static void expectExpression() {
-        while (!hasNextTokenValues(";", "}")) {
+        while (!hasNextTokenValues(";", "}", "]")) {
             Token t = tokenList.get(tokenIndex);
             if (t.type.equals(TokenType.COMMA) || t.type.equals(TokenType.CLOSE_BRACKET)) {
                 break; // For several variables declaration + initialization.
@@ -1274,11 +1298,17 @@ public class Eden {
         private final String name;
         private final ElemKind kind;
         private final int shift;
+        private final boolean isArray;
 
         public OpAssign(String name, ElemKind kind, int shift) {
+            this(name, kind, shift, false);
+        }
+
+        public OpAssign(String name, ElemKind kind, int shift, boolean isArray) {
             this.name = name;
-            this.kind = kind; // TODO: think, maybe it's unusable
+            this.kind = kind;
             this.shift = shift;
+            this.isArray = isArray;
         }
 
         @Override
@@ -1288,10 +1318,25 @@ public class Eden {
 
         @Override
         public void generate() {
-            // Local
             programCode.append("\n;OpAssign ").append(name).append(":").append(kind.name()).append(":").append(shift);
-            programCode.append("\n\tPOP eax");
-            programCode.append("\n\tMOV dword [ebp - ").append(shift).append("], eax");
+            // Local
+            if (kind.equals(ElemKind.LOCAL)) {
+                if (isArray) {
+                    programCode.append("\n\tPOP ecx");
+                    programCode.append("\n\tPOP eax");
+                    programCode.append("\n\tMOV esi, 4"); // FOR INT
+                    programCode.append("\n\tMUL esi");
+                    programCode.append("\n\tMOV ebx, eax");
+                    programCode.append("\n\tMOV eax, ecx");
+                    programCode.append("\n\tADD ebx, ").append(shift);
+                    programCode.append("\n\tMOV edx, ebp");
+                    programCode.append("\n\tSUB edx, ebx"); // SUB - LOCAL
+                    programCode.append("\n\tMOV dword [edx], eax");
+                } else {
+                    programCode.append("\n\tPOP eax");
+                    programCode.append("\n\tMOV dword [ebp - ").append(shift).append("], eax");
+                }
+            }
         }
     }
 
@@ -1340,6 +1385,7 @@ public class Eden {
         ElemKind kind;
         int shift;
         boolean isRoutine;
+        boolean isInit;
         Token token;
 
         public SymbolTableElem(String name, String type, ElemKind kind, int shift, boolean isRoutine) {
@@ -1348,6 +1394,7 @@ public class Eden {
             this.kind = kind;
             this.shift = shift;
             this.isRoutine = isRoutine;
+            this.isInit = false;
             this.token = tokenList.get(tokenIndex - 1);
         }
 

@@ -1,27 +1,39 @@
 class Hello {
 
     func void main() {
-//        Point b;
-//        a = b.getInt();
-//        b.print();
-        ~ "Test: ";
-        Hello.printSix(4, 3);
-        ~ retBool();
+        int a, b, d;
+        a = 1;
+        b = 3;
+        d = 8;
+        a[1] = 2; // b = 2
+        a[b-a] = b + a; // a[2-1] = a[1] = b == 2 + 1 = 3
+        ~ "a: "; ~ a;
+        ~ "\nb: "; ~ b;
+        ~ "\nd: "; ~ d;
     }
 
-    func void printSix(int b, int c) {
-        int a = 6 + b - c + unused();
-        ~ a; ~ "\n";
-    }
-
-    func int unused() {
-        ~ "Hello: ";
-        return 1 + (2 * 2);
-    }
-
-    func bool retBool() {
-        return true;
-    }
+//    func void main2() {
+////        Point b;
+////        a = b.getInt();
+////        b.print();
+//        ~ "Test: ";
+//        Hello.printSix(4, 3);
+//        ~ retBool();
+//    }
+//
+//    func void printSix(int b, int c) {
+//        int a = 6 + b - c + unused();
+//        ~ a; ~ "\n";
+//    }
+//
+//    func int unused() {
+//        ~ "Hello: ";
+//        return 1 + (2 * 2);
+//    }
+//
+//    func bool retBool() {
+//        return true;
+//    }
 
 //
 //    method int test(bool kek ) {
