@@ -1,10 +1,10 @@
 class Hello {
 
     func void main() {
-        int a, b, d;
-        a = 1;
-        b = 3;
-        d = 8;
+        int a = 1, b = 3, d = 8;
+//        a = 1;
+//        b = 3;
+//        d = 8;
 //        a[1] = d;
 //        d = a[1]; // d = b
         a[0] = a[2] + a[1]; // a = d + b

@@ -660,15 +660,13 @@ public class Eden {
     }
 
     static void expectExpression() {
-        while (!hasNextTokenValues(";", "}", "]")) {
-            Token t = tokenList.get(tokenIndex);
-            if (t.type.equals(TokenType.COMMA) || t.type.equals(TokenType.CLOSE_BRACKET)) {
-                break; // For several variables declaration + initialization.
-            }
-            part();
-            sum();
-//            logical();
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.COMMA) || t.type.equals(TokenType.CLOSE_BRACKET)) {
+            return; //break; // For several variables declaration + initialization.
         }
+        part();
+        sum();
+//            logical();
     }
 
     static void sum() {
