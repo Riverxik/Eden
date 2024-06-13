@@ -471,6 +471,23 @@ public class Eden {
         intermediateRepresentation.add(opAssign);
     }
 
+    static void expectArrayExpr(String identifierName) {
+        SymbolTableElem var = getVarByName(identifierName);
+        if (var == null) {
+            printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + identifierName);
+        }
+        assert var != null;
+        assert var.shift != 0;
+        intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift, false));
+        tokenIndex++; // [
+        expectExpression();
+        tokenIndex++; // ]
+        intermediateRepresentation.add(new OpPushNumber(4)); // INT 4 bytes
+        intermediateRepresentation.add(new OpMultiply());
+        intermediateRepresentation.add(new OpMinus());
+        intermediateRepresentation.add(new OpDereference());
+    }
+
     static void expectFuncCall(String identifierName) {
         String callName;
         int nArgs = 0;
@@ -480,7 +497,7 @@ public class Eden {
             try {
                 // a.calc();
                 SymbolTableElem var = getVarByName(identifierName);
-                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
+                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift, false));
                 nArgs++;
                 callName = var.type + "." + subName;
             } catch (RuntimeException ignored) {
@@ -629,8 +646,10 @@ public class Eden {
             var.isInit = true;
         }
         usedVariables.add(var);
+        OpPushVar opPushVar = new OpPushVar(var.name, var.kind, var.shift, false);
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
         tokenIndex++; // =
+        intermediateRepresentation.add(opPushVar);
         expectExpression();
         intermediateRepresentation.add(opAssign);
     }
@@ -747,20 +766,24 @@ public class Eden {
                 printErrToken(t, "Expected close bracket, but found");
             }
         } else if (t.type.equals(TokenType.SYMBOL)) {
-            // Array
-            // Subroutine call
+            String identifierName = String.valueOf(t.value);
             Token next = tokenList.get(tokenIndex + 1);
-            if (next.type == TokenType.DOT || next.type == TokenType.OPEN_BRACKET) {
+            if (next.type == TokenType.OPEN_SQUARE_BRACKET) {
+                // Array
                 tokenIndex++;
-                expectFuncCall(String.valueOf(t.value));
+                expectArrayExpr(identifierName);
+            } else if (next.type == TokenType.DOT || next.type == TokenType.OPEN_BRACKET) {
+                // Subroutine call
+                tokenIndex++;
+                expectFuncCall(identifierName);
             } else {
                 // Variable
-                SymbolTableElem var = getVarByName((String) t.value);
+                SymbolTableElem var = getVarByName(identifierName);
                 if (var == null) {
-                    printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + t.value);
+                    printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + identifierName);
                 }
                 assert var != null;
-                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift));
+                intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift, true));
                 tokenIndex++;
             }
         } else if (t.type.equals(TokenType.NUMBER)) {
@@ -1318,10 +1341,10 @@ public class Eden {
 
         @Override
         public void generate() {
-            programCode.append("\n;OpAssign ").append(name).append(":").append(kind.name()).append(":").append(shift);
             // Local
             if (kind.equals(ElemKind.LOCAL)) {
                 if (isArray) {
+                    programCode.append("\n;OpAssign Array ").append(name).append(":").append(kind.name()).append(":").append(shift);
                     programCode.append("\n\tPOP ecx");
                     programCode.append("\n\tPOP eax");
                     programCode.append("\n\tMOV esi, 4"); // FOR INT
@@ -1333,8 +1356,10 @@ public class Eden {
                     programCode.append("\n\tSUB edx, ebx"); // SUB - LOCAL
                     programCode.append("\n\tMOV dword [edx], eax");
                 } else {
-                    programCode.append("\n\tPOP eax");
-                    programCode.append("\n\tMOV dword [ebp - ").append(shift).append("], eax");
+                    programCode.append("\n;OpAssign ").append(name).append(":").append(kind.name()).append(":").append(shift);
+                    programCode.append("\n\tPOP eax"); // expr
+                    programCode.append("\n\tPOP ebx"); // adr
+                    programCode.append("\n\tMOV dword [ebx], eax");
                 }
             }
         }
@@ -1344,11 +1369,13 @@ public class Eden {
         private final String name;
         private final int shift;
         private final ElemKind kind;
+        private boolean isDereference;
 
-        public OpPushVar(String name, ElemKind kind, int shift) {
+        public OpPushVar(String name, ElemKind kind, int shift, boolean isDereference) {
             this.name = name;
             this.kind = kind;
             this.shift = shift;
+            this.isDereference = isDereference;
         }
 
         @Override
@@ -1361,13 +1388,41 @@ public class Eden {
             programCode.append("\n;OpPushVar ").append(name).append(":").append(kind.name()).append(":").append(shift);
             switch (kind) {
                 case LOCAL: {
-                    programCode.append("\n\tPUSH dword [ebp - ").append(shift).append("]");
+                    if (isDereference) {
+                        programCode.append("\n\tPUSH dword [ebp - ").append(shift).append("]");
+                    } else {
+                        programCode.append("\n\tMOV eax, ebp");
+                        programCode.append("\n\tSUB eax, ").append(shift);
+                        programCode.append("\n\tPUSH eax");
+                    }
                 } break;
                 case ARGUMENT: {
-                    programCode.append("\n\tPUSH dword [ebp + ").append(4 + shift).append("]");
+                    if (isDereference) {
+                        programCode.append("\n\tPUSH dword [ebp + ").append(4 + shift).append("]");
+                    } else {
+                        programCode.append("\n\tMOV eax, ebp");
+                        programCode.append("\n\tADD eax, 4");
+                        programCode.append("\n\tADD eax, ").append(shift);
+                        programCode.append("\n\tPUSH eax");
+                    }
                 } break;
                 default: throw new NotImplementedException();
             }
+        }
+    }
+
+    static class OpDereference implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpDereference ");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tPUSH dword [eax]");
         }
     }
 
