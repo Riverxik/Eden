@@ -1,6 +1,0 @@
-int stdOutHandle;
-int writtenBuff;
-int resultCode;
-stdOutHandle = wincall("GetStdHandle", -11); // -11 for stdOut
-resultCode = wincall("WriteFile", 0, writtenBuff, 13, "Hello world\n", stdOutHandle);
-~ resultCode; // Check for non zero code
