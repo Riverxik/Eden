@@ -1,3 +1,5 @@
+package ru.riverx.eden;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.*;
@@ -36,7 +38,7 @@ public class Eden {
     public static void main(String[] args) throws IOException, InterruptedException {
         // Args
         if (args.length == 0) {
-            System.out.println("Usage: eden -s scrName.eden");
+            System.out.println("Usage: Eden -s scrName.eden");
             System.exit(1);
         }
         int i = 0;
@@ -71,7 +73,7 @@ public class Eden {
         lexer.tokenize();
         lexer.clearComments();
 
-        tokenList.forEach(System.out::println);
+        //tokenList.forEach(System.out::println);
 
         // Parsing.
         parse();
