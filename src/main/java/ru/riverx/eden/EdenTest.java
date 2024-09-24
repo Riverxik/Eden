@@ -1,21 +1,17 @@
+package ru.riverx.eden;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Objects;
 
 public class EdenTest {
+    public static final String EXIT_CODE_SEPARATOR = ";\n";
     private static boolean isCaptureMode = false;
-    private static boolean isRebuild = false;
     private static boolean isFullTesting = false;
     public static void main(String[] args) throws IOException, InterruptedException {
         if (args.length == 0) { printHelp(); return; }
         String sourceName = parseArgs(args);
-        if (isRebuild) {
-            System.out.println("[INFO] Compiling latest version of Eden compiler...");
-            executeCommandAndReturnStringOutput("mvn clean compile package");
-            System.out.println("[INFO] Copying jar to project folder...");
-            executeCommandAndReturnStringOutput("copy /Y /B target\\Eden-*.jar /B Eden.jar");
-        }
         if (isCaptureMode) {
             captureTest(sourceName);
         } else if (isFullTesting) {
@@ -66,7 +62,7 @@ public class EdenTest {
                 }
             }
             if (args[i].equalsIgnoreCase("-c")) { isCaptureMode = true; }
-            if (args[i].equals("-r")) { isRebuild = true; }
+//            if (args[i].equals("-r")) { isRebuild = true; }
             if (args[i].equals("-f")) { isFullTesting = true; }
             i++;
         }
@@ -132,7 +128,12 @@ public class EdenTest {
     }
 
     private static String executeCommandAndReturnStringOutput(String execCmd) throws IOException, InterruptedException {
-        Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
+        ProcessBuilder pBuilder = new ProcessBuilder();
+        execCmd = "cmd.exe /c " + execCmd;
+        pBuilder.directory(new File(System.getProperty("user.dir")));
+        pBuilder.command(execCmd.split(" "));
+        //Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
+        Process process = pBuilder.start();
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             System.err.println("Error while execute command: " + execCmd);
@@ -142,7 +143,7 @@ public class EdenTest {
             }
             errStream.close();
         }
-        return readInputStream(process.getInputStream());
+        return exitCode + EXIT_CODE_SEPARATOR + readInputStream(process.getInputStream());
     }
 
     private static String readInputStream(InputStream inputStream) throws IOException {
