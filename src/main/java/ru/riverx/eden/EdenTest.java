@@ -103,8 +103,10 @@ public class EdenTest {
 
     private static int checkTest(String sourceName, String expectedOutput) throws IOException, InterruptedException {
         String interpreterOutput = executeCommandAndReturnStringOutput("java -jar Eden.jar -s " + sourceName);
-        executeCommandAndReturnStringOutput("java -jar Eden.jar -c -s " + sourceName);
-        String compilerOutput = executeCommandAndReturnStringOutput(sourceName.replaceAll("/", "\\\\").split("[.]")[0]+".exe");
+        String compilerOutput = executeCommandAndReturnStringOutput("java -jar Eden.jar -c -s " + sourceName);
+        if (Objects.equals(compilerOutput.split(EXIT_CODE_SEPARATOR)[0], "0")) {
+            compilerOutput = executeCommandAndReturnStringOutput(sourceName.replaceAll("/", "\\\\").split("[.]")[0]+".exe");
+        }
         int errorCode = 0;
         if (!interpreterOutput.equals(expectedOutput)) {
             System.err.println("[ERROR] Interpreter output is different from expected for: " + sourceName);
