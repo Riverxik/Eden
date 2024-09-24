@@ -1191,7 +1191,7 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            programStack.push(value);
         }
 
         @Override
@@ -1205,7 +1205,8 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            int value = Integer.parseInt(String.valueOf(programStack.pop()));
+            programStack.push(-value);
         }
 
         @Override
@@ -1221,7 +1222,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            programStack.add(a + b);
         }
 
         @Override
@@ -1241,7 +1244,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            programStack.add(a - b);
         }
 
         @Override
@@ -1261,7 +1266,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            programStack.add(a * b);
         }
 
         @Override
@@ -1281,7 +1288,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            programStack.add(a / b);
         }
 
         @Override
