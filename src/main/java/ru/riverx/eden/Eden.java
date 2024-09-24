@@ -32,6 +32,7 @@ public class Eden {
     static String mainFuncName;
     static int uniqueIndex = 0;
     static byte[] Memory = new byte[MAX_INTERPRET_MEMORY_SIZE];
+    static Stack<Object> programStack = new Stack<>();
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
 
@@ -88,6 +89,8 @@ public class Eden {
             if (isSuccess && isRunAfterCompilation) {
                 System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
             }
+        } else {
+            intermediateRepresentation.forEach(Op::interpret);
         }
     }
 
@@ -940,7 +943,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            for (int i = 0; i < localVarCount; i++) {
+                programStack.add(0);
+            }
         }
 
         @Override
@@ -1073,7 +1078,10 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            boolean isVoid = validateReturnType();
+            if (!isVoid) {
+                programStack.pop();
+            }
         }
 
         @Override
@@ -1140,7 +1148,9 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            Object value = programStack.pop();
+            // TODO: There might be more special characters
+            System.out.printf(String.valueOf(value).replace("\\n", "\r\n"));
         }
 
         @Override
@@ -1160,7 +1170,7 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            programStack.push(value);
         }
 
         @Override
