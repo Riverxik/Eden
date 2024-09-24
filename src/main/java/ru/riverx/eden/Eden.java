@@ -1688,6 +1688,9 @@ public class Eden {
         void tokenize() {
             while (!isEndOfFile) {
                 currentChar = peek();
+                if (currentChar == '\0') {
+                    continue; // EOF.
+                }
                 // White spaces.
                 if (Character.isWhitespace(currentChar)) {
                     column++;
