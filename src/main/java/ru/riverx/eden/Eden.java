@@ -5,6 +5,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
@@ -62,12 +63,15 @@ public class Eden {
             i++;
         }
 
+        // TODO: Почему мы читаем только 1 файл, хочется читать папку с классами
+        // TODO: Дополнительно, необходимо проверять имя файла и имя класса на совпадение (есть тест)
         // Reading the source
-        if (!Files.exists(Paths.get(sourceName))) {
+        Path sourcePath = Paths.get(sourceName);
+        if (!Files.exists(sourcePath)) {
             System.out.println("File does not exists: " + sourceName);
             System.exit(1);
         }
-        String source = new String(Files.readAllBytes(Paths.get(sourceName)), StandardCharsets.UTF_8);
+        String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
 
         // Lexing.
         Lexer lexer = new Lexer(source, tokenList);
