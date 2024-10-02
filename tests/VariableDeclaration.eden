@@ -1,0 +1,12 @@
+class VariableDeclaration {
+    func void main() {
+        int a = 0, b = 8;
+        ~ a; // 0
+        ~ b;
+        a = b - 6;
+        ~ a; // a = 2
+        int c = a + b;
+        ~ c; // 10
+        // 08210
+    }
+}

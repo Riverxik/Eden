@@ -627,7 +627,8 @@ public class Eden {
         String lVarName = localVarName.get();
         SymbolTableElem existingVar = getVarByName(lVarName);
         if (existingVar == null) {
-            symbolTable.add(new SymbolTableElem(lVarName, varType, ElemKind.LOCAL, localVarShift++, false));
+            localVarShift += calculateShift(varType);
+            symbolTable.add(new SymbolTableElem(lVarName, varType, ElemKind.LOCAL, localVarShift, false));
             localVarCount++;
         } else {
             printErrToken(tokenList.get(tokenIndex - 1), "Variable already defined in this scope: " + lVarName);
@@ -649,11 +650,6 @@ public class Eden {
         }
         assert var != null;
         assert var.kind.equals(ElemKind.LOCAL);
-        if (!var.isInit) {
-            int shift = calculateShift(var.type);
-            var.shift = shift + var.shift * shift;
-            var.isInit = true;
-        }
         usedVariables.add(var);
         OpPushVar opPushVar = new OpPushVar(var.name, var.kind, var.shift, false);
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
@@ -935,6 +931,7 @@ public class Eden {
         private final String name;
         private final String type;
         private final int argsCount;
+        private int stackSizeInit;
         private int localVarCount = 0;
         private final boolean isMain;
 
@@ -947,6 +944,7 @@ public class Eden {
 
         @Override
         public void interpret() {
+            stackSizeInit = programStack.size();
             for (int i = 0; i < localVarCount; i++) {
                 programStack.add(0);
             }
@@ -964,15 +962,9 @@ public class Eden {
             programCode.append("\n\tMOV ebp, esp");
             if (localVarCount != 0) {
                 programCode.append("\n\tSUB esp, ").append(4*localVarCount);
-                /*programCode.append("\n\tMOV ecx, 0");
-                programCode.append("\n\tMOV ebx, ").append(localVarCount);
-                programCode.append("\n").append(name).append("Init:");
-                programCode.append("\n\tCMP ecx, ebx");
-                programCode.append("\n\tJE ").append(name).append("Body");
-                programCode.append("\n\tPUSH 0");
-                programCode.append("\n\tINC ecx");
-                programCode.append("\n\tJMP ").append(name).append("Init");
-                programCode.append("\n").append(name).append("Body:");*/
+                for (int i = 1; i < localVarCount + 1; i++) {
+                    programCode.append("\n\tMOV DWORD [ebp-").append(4*i).append("], 0");
+                }
             }
 
         }
@@ -1010,6 +1002,10 @@ public class Eden {
 
         public String getType() {
             return type;
+        }
+
+        public int getStackSizeInit() {
+            return stackSizeInit;
         }
     }
 
@@ -1083,9 +1079,13 @@ public class Eden {
         @Override
         public void interpret() {
             boolean isVoid = validateReturnType();
-            if (!isVoid) {
+            int stackInitSize = getStackInitSizeFromIR();
+            int count = programStack.size() - stackInitSize;
+            for (int i = 0; i < count; i++) {
                 programStack.pop();
             }
+            // TODO: we have to pass result to caller func through the stack,
+            //  but at the same time we have to get rid of local variables
         }
 
         @Override
@@ -1145,6 +1145,19 @@ public class Eden {
                 break;
             }
             return false;
+        }
+
+        private int getStackInitSizeFromIR() {
+            int index = intermediateRepresentation.indexOf(this);
+            for (int i = index; i >= 0; i--) {
+                Op op = intermediateRepresentation.get(i);
+                if (!(op instanceof OpFunc)) {
+                    continue;
+                }
+                OpFunc func = (OpFunc) op;
+                return func.getStackSizeInit();
+            }
+            throw new RuntimeException("Can't find a function for this return op");
         }
     }
 
@@ -1359,7 +1372,15 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            if (kind.equals(ElemKind.LOCAL)) {
+                if (isArray) {
+                    throw new NotImplementedException();
+                } else {
+                    Object expr = programStack.pop();
+                    Object adr = programStack.pop();
+                    programStack.set(Integer.parseInt(String.valueOf(adr)), expr);
+                }
+            }
         }
 
         @Override
@@ -1392,7 +1413,7 @@ public class Eden {
         private final String name;
         private final int shift;
         private final ElemKind kind;
-        private boolean isDereference;
+        private final boolean isDereference;
 
         public OpPushVar(String name, ElemKind kind, int shift, boolean isDereference) {
             this.name = name;
@@ -1403,7 +1424,20 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            switch (kind) {
+                case LOCAL: {
+                    int index = (localVarShift - shift) / 4;
+                    if (isDereference) {
+                        programStack.push(programStack.get(index));
+                    } else {
+                        programStack.push(index);
+                    }
+                } break;
+                case ARGUMENT: {
+                    // let it through, cause not implemented yet
+                }
+                default: throw new NotImplementedException();
+            }
         }
 
         @Override
@@ -1463,7 +1497,6 @@ public class Eden {
         ElemKind kind;
         int shift;
         boolean isRoutine;
-        boolean isInit;
         Token token;
 
         public SymbolTableElem(String name, String type, ElemKind kind, int shift, boolean isRoutine) {
@@ -1472,7 +1505,6 @@ public class Eden {
             this.kind = kind;
             this.shift = shift;
             this.isRoutine = isRoutine;
-            this.isInit = false;
             this.token = tokenList.get(tokenIndex - 1);
         }
 
