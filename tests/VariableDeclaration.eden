@@ -1,6 +1,6 @@
 class VariableDeclaration {
     func void main() {
-        int a = 0, b = 8;
+        int a, b = 8;
         ~ a; // 0
         ~ b;
         a = b - 6;
