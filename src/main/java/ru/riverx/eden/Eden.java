@@ -938,13 +938,11 @@ public class Eden {
         private final String type;
         private final int argsCount;
         private int localVarCount = 0;
-        private final boolean isMain;
 
         public OpFunc(String name, String type, int argsCount) {
             this.name = name;
             this.type = type;
             this.argsCount = argsCount;
-            this.isMain = name.split("[.]")[1].equals("Eden_main");
         }
 
         @Override
