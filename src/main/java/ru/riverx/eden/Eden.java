@@ -34,8 +34,11 @@ public class Eden {
     static int uniqueIndex = 0;
     static byte[] Memory = new byte[MAX_INTERPRET_MEMORY_SIZE];
     static Stack<Object> programStack = new Stack<>();
+    static Object registerA = 0;
+    static Stack<Integer> stackSizeList = new Stack<>();
     static boolean isInterpreter = true;
     static boolean isRunAfterCompilation = false;
+    static int irPointer = 0;
 
     public static void main(String[] args) throws IOException, InterruptedException {
         // Args
@@ -94,7 +97,9 @@ public class Eden {
                 System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
             }
         } else {
-            intermediateRepresentation.forEach(Op::interpret);
+            while (irPointer >= 0) {
+                intermediateRepresentation.get(irPointer).interpret();
+            }
         }
     }
 
@@ -786,6 +791,7 @@ public class Eden {
                     printErrToken(tokenList.get(tokenIndex - 1), "Undeclared variable: " + identifierName);
                 }
                 assert var != null;
+                usedVariables.add(var);
                 intermediateRepresentation.add(new OpPushVar(var.name, var.kind, var.shift, true));
                 tokenIndex++;
             }
@@ -931,7 +937,6 @@ public class Eden {
         private final String name;
         private final String type;
         private final int argsCount;
-        private int stackSizeInit;
         private int localVarCount = 0;
         private final boolean isMain;
 
@@ -944,10 +949,11 @@ public class Eden {
 
         @Override
         public void interpret() {
-            stackSizeInit = programStack.size();
+            stackSizeList.push(programStack.size());
             for (int i = 0; i < localVarCount; i++) {
                 programStack.add(0);
             }
+            irPointer++;
         }
 
         @Override
@@ -1003,10 +1009,6 @@ public class Eden {
         public String getType() {
             return type;
         }
-
-        public int getStackSizeInit() {
-            return stackSizeInit;
-        }
     }
 
     static class OpCall implements Op {
@@ -1021,7 +1023,36 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            EdenType type = validateDeclaration();
+            validateGivenArgs();
+            runSubRoutine();
+            for (int i = 0; i < nArgs; i++) {
+                programStack.pop();
+            }
+            if (!type.equals(EdenType.VOID)) {
+                programStack.push(registerA);
+            }
+        }
+
+        private void runSubRoutine() {
+            int currentPoint = irPointer;
+            irPointer = getCallFuncIndex();
+            Op currentOp;
+            do {
+                currentOp = intermediateRepresentation.get(irPointer);
+                currentOp.interpret();
+            } while (!(currentOp instanceof OpReturn));
+            irPointer = currentPoint + 1;
+        }
+
+        private int getCallFuncIndex() {
+            for (int i = 0; i < intermediateRepresentation.size(); i++) {
+                Op op = intermediateRepresentation.get(i);
+                if (op instanceof OpFunc && ((OpFunc) op).getName().equals(callName)) {
+                    return i;
+                }
+            }
+            throw new RuntimeException("Can't find index for call function");
         }
 
         @Override
@@ -1030,10 +1061,8 @@ public class Eden {
             validateGivenArgs();
             programCode.append("\n;OpCall ").append(callName).append(" - ").append(nArgs);
             programCode.append("\n\tCALL ").append(callName);
-            if (nArgs > 0) {
-                for (int i = 0; i < nArgs; i++) {
-                    programCode.append("\n\tPOP edx");
-                }
+            for (int i = 0; i < nArgs; i++) {
+                programCode.append("\n\tPOP edx");
             }
             if (!type.equals(EdenType.VOID)) {
                 programCode.append("\n\tPUSH eax");
@@ -1078,9 +1107,16 @@ public class Eden {
 
         @Override
         public void interpret() {
+            if (stackSizeList.isEmpty()) {
+                irPointer = -1;
+                return;
+            }
             boolean isVoid = validateReturnType();
-            int stackInitSize = getStackInitSizeFromIR();
+            int stackInitSize = stackSizeList.pop();
             int count = programStack.size() - stackInitSize;
+            if (!isVoid) {
+                registerA = programStack.peek();
+            }
             for (int i = 0; i < count; i++) {
                 programStack.pop();
             }
@@ -1146,19 +1182,6 @@ public class Eden {
             }
             return false;
         }
-
-        private int getStackInitSizeFromIR() {
-            int index = intermediateRepresentation.indexOf(this);
-            for (int i = index; i >= 0; i--) {
-                Op op = intermediateRepresentation.get(i);
-                if (!(op instanceof OpFunc)) {
-                    continue;
-                }
-                OpFunc func = (OpFunc) op;
-                return func.getStackSizeInit();
-            }
-            throw new RuntimeException("Can't find a function for this return op");
-        }
     }
 
     static class OpPrint implements Op {
@@ -1168,6 +1191,7 @@ public class Eden {
             Object value = programStack.pop();
             // TODO: There might be more special characters
             System.out.printf(String.valueOf(value).replace("\\n", "\r\n"));
+            irPointer++;
         }
 
         @Override
@@ -1188,6 +1212,7 @@ public class Eden {
         @Override
         public void interpret() {
             programStack.push(value);
+            irPointer++;
         }
 
         @Override
@@ -1209,6 +1234,7 @@ public class Eden {
         @Override
         public void interpret() {
             programStack.push(value);
+            irPointer++;
         }
 
         @Override
@@ -1224,6 +1250,7 @@ public class Eden {
         public void interpret() {
             int value = Integer.parseInt(String.valueOf(programStack.pop()));
             programStack.push(-value);
+            irPointer++;
         }
 
         @Override
@@ -1242,6 +1269,7 @@ public class Eden {
             int b = Integer.parseInt(String.valueOf(programStack.pop()));
             int a = Integer.parseInt(String.valueOf(programStack.pop()));
             programStack.add(a + b);
+            irPointer++;
         }
 
         @Override
@@ -1264,6 +1292,7 @@ public class Eden {
             int b = Integer.parseInt(String.valueOf(programStack.pop()));
             int a = Integer.parseInt(String.valueOf(programStack.pop()));
             programStack.add(a - b);
+            irPointer++;
         }
 
         @Override
@@ -1286,6 +1315,7 @@ public class Eden {
             int b = Integer.parseInt(String.valueOf(programStack.pop()));
             int a = Integer.parseInt(String.valueOf(programStack.pop()));
             programStack.add(a * b);
+            irPointer++;
         }
 
         @Override
@@ -1308,6 +1338,7 @@ public class Eden {
             int b = Integer.parseInt(String.valueOf(programStack.pop()));
             int a = Integer.parseInt(String.valueOf(programStack.pop()));
             programStack.add(a / b);
+            irPointer++;
         }
 
         @Override
@@ -1329,7 +1360,8 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            programStack.push(1);
+            irPointer++;
         }
 
         @Override
@@ -1343,7 +1375,8 @@ public class Eden {
 
         @Override
         public void interpret() {
-            throw new NotImplementedException();
+            programStack.push(0);
+            irPointer++;
         }
 
         @Override
@@ -1379,7 +1412,10 @@ public class Eden {
                     Object expr = programStack.pop();
                     Object adr = programStack.pop();
                     programStack.set(Integer.parseInt(String.valueOf(adr)), expr);
+                    irPointer++;
                 }
+            } else {
+                throw new NotImplementedException();
             }
         }
 
@@ -1405,6 +1441,8 @@ public class Eden {
                     programCode.append("\n\tPOP ebx"); // adr
                     programCode.append("\n\tMOV dword [ebx], eax");
                 }
+            } else {
+                throw new NotImplementedException();
             }
         }
     }
@@ -1426,16 +1464,23 @@ public class Eden {
         public void interpret() {
             switch (kind) {
                 case LOCAL: {
-                    int index = (localVarShift - shift) / 4;
+                    int index = stackSizeList.peek() - 1 + shift / 4;
                     if (isDereference) {
                         programStack.push(programStack.get(index));
                     } else {
                         programStack.push(index);
                     }
+                    irPointer++;
                 } break;
                 case ARGUMENT: {
-                    // let it through, cause not implemented yet
-                }
+                    int index = stackSizeList.peek() - shift / 4;
+                    if (isDereference) {
+                        programStack.push(programStack.get(index));
+                    } else {
+                        programStack.push(index);
+                    }
+                    irPointer++;
+                } break;
                 default: throw new NotImplementedException();
             }
         }
@@ -1540,9 +1585,18 @@ public class Eden {
         symbolTable.removeAll(usedVariables);
         List<SymbolTableElem> toRemove = new ArrayList<>();
         for (SymbolTableElem e : symbolTable) {
-            if (e.kind.equals(ElemKind.LOCAL)) {
-                printWarnToken(e.token, "Variable is defined, but not used: " + e.name + " in " + classFunName);
-                toRemove.add(e);
+            switch (e.kind) {
+                case LOCAL: {
+                    printWarnToken(e.token, "Local variable is defined, but not used: " + e.name + " in " + classFunName);
+                    toRemove.add(e);
+                } break;
+                case ARGUMENT: {
+                    printWarnToken(e.token, "Argument variable is defined, but not used: " + e.name + " in " + classFunName);
+                    toRemove.add(e);
+                } break;
+                default: {
+                    throw new NotImplementedException();
+                }
             }
         }
         symbolTable.removeAll(toRemove);
