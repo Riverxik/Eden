@@ -722,7 +722,9 @@ public class Eden {
         }
         part();
         sum();
+        shift();
         logical();
+        bitwise();
     }
 
     static void sum() {
@@ -741,30 +743,70 @@ public class Eden {
         }
     }
 
+    static void shift() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.L_SHIFT)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpLeftShift());
+        }
+        if (t.type.equals(TokenType.R_SHIFT)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpRightShift());
+        }
+    }
+
+    static void bitwise() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.B_AND)) {
+            tokenIndex++;
+            part();
+            sum();
+            shift();
+            logical();
+            intermediateRepresentation.add(new OpBitAnd());
+        }
+        if (t.type.equals(TokenType.B_OR)) {
+            tokenIndex++;
+            part();
+            sum();
+            shift();
+            logical();
+            intermediateRepresentation.add(new OpBitOr());
+        }
+    }
+
     static void logical() {
         Token t = tokenList.get(tokenIndex);
         if (t.type.equals(TokenType.GREATER)) {
             tokenIndex++;
             part();
             sum();
+            shift();
             intermediateRepresentation.add(new OpMore());
         }
         if (t.type.equals(TokenType.LESS)) {
             tokenIndex++;
             part();
             sum();
+            shift();
             intermediateRepresentation.add(new OpLess());
         }
         if (t.type.equals(TokenType.EQUALS)) {
             tokenIndex++;
             part();
             sum();
+            shift();
             intermediateRepresentation.add(new OpEqual());
         }
         if (t.type.equals(TokenType.NEGATE)) {
             tokenIndex++;
             part();
             sum();
+            shift();
             intermediateRepresentation.add(new OpLogicalNeg());
         }
     }
@@ -1596,6 +1638,90 @@ public class Eden {
             programCode.append("\n\tADD eax, 2");
             programCode.append("\n\tPUSH eax");
             programCode.append("\n").append(uniqueLabelEnd).append(":");
+        }
+    }
+
+    static class OpLeftShift implements Op {
+
+        @Override
+        public void interpret() {
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first << second;
+            programStack.push(result);
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpLeftShift");
+            programCode.append("\n\tPOP ecx");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tSHL ebx, cl");
+            programCode.append("\n\tPUSH ebx");
+        }
+    }
+
+    static class OpRightShift implements Op {
+
+        @Override
+        public void interpret() {
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first >> second;
+            programStack.push(result);
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpRightShift");
+            programCode.append("\n\tPOP ecx");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tSHR ebx, cl");
+            programCode.append("\n\tPUSH ebx");
+        }
+    }
+
+    static class OpBitAnd implements Op {
+
+        @Override
+        public void interpret() {
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first & second;
+            programStack.push(result);
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\t;OpBitAnd");
+            programCode.append("\t\nPOP eax");
+            programCode.append("\t\nPOP ebx");
+            programCode.append("\t\nAND eax, ebx");
+            programCode.append("\t\nPUSH eax");
+        }
+    }
+
+    static class OpBitOr implements Op {
+
+        @Override
+        public void interpret() {
+            int second = Integer.parseInt(String.valueOf(programStack.pop()));
+            int first = Integer.parseInt(String.valueOf(programStack.pop()));
+            int result = first | second;
+            programStack.push(result);
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpBitOr");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tOR eax, ebx");
+            programCode.append("\n\tPUSH eax");
         }
     }
 
