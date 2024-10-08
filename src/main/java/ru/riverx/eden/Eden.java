@@ -579,10 +579,56 @@ public class Eden {
         expectTokenType(TokenType.OPEN_CURLY_BRACKET);
         int localVarCount = 0;
         while (!hasNextTokenValues("}")) {
+            if (expectIfBlock()) {
+                continue;
+            }
+            if (expectWhileBlock()) {
+                continue;
+            }
             localVarCount += expectStatement();
         }
         expectTokenType(TokenType.CLOSE_CURLY_BRACKET);
         return localVarCount;
+    }
+
+    static boolean expectIfBlock() {
+        if (!hasNextTokenValues("if")) {
+            return false;
+        }
+        int uniqueIndex = getUniqueIndex();
+        String ifLabelStart = String.format("if_start_%d", uniqueIndex);
+        String ifLabelEnd = String.format("if_end_%d", uniqueIndex);
+        expectKeyword("if");
+        expectExpression();
+        intermediateRepresentation.add(new OpLogicalNeg());
+        intermediateRepresentation.add(new OpIfGoto(ifLabelStart));
+        expectBlockStatement();
+        intermediateRepresentation.add(new OpGoto(ifLabelEnd));
+        intermediateRepresentation.add(new OpLabel(ifLabelStart));
+        if (hasNextTokenValues("else")) {
+            expectKeyword("else");
+            expectBlockStatement();
+        }
+        intermediateRepresentation.add(new OpLabel(ifLabelEnd));
+        return true;
+    }
+
+    static boolean expectWhileBlock() {
+        if (!hasNextTokenValues("while")) {
+            return false;
+        }
+        int uniqueIndex = getUniqueIndex();
+        String whileLabelStart = String.format("while_start_%d", uniqueIndex);
+        String whileLabelEnd = String.format("while_end_%d", uniqueIndex);
+        expectKeyword("while");
+        intermediateRepresentation.add(new OpLabel(whileLabelStart));
+        expectExpression();
+        intermediateRepresentation.add(new OpLogicalNeg());
+        intermediateRepresentation.add(new OpIfGoto(whileLabelEnd));
+        expectBlockStatement();
+        intermediateRepresentation.add(new OpGoto(whileLabelStart));
+        intermediateRepresentation.add(new OpLabel(whileLabelEnd));
+        return true;
     }
 
     static int expectStatement() {
@@ -676,7 +722,7 @@ public class Eden {
         }
         part();
         sum();
-//            logical();
+        logical();
     }
 
     static void sum() {
@@ -695,27 +741,33 @@ public class Eden {
         }
     }
 
-//    static void logical() {
-//        Token t = tokenList.get(tokenIndex);
-//        if (t.type.equals(TokenType.GREATER)) {
-//            tokenIndex++;
-//            part();
-//            sum();
-//            intermediateRepresentation.add(new OpMore());
-//        }
-//        if (t.type.equals(TokenType.LESS)) {
-//            tokenIndex++;
-//            part();
-//            sum();
-//            intermediateRepresentation.add(new OpLess());
-//        }
-//        if (t.type.equals(TokenType.EQUALS)) {
-//            tokenIndex++;
-//            part();
-//            sum();
-//            intermediateRepresentation.add(new OpEqual());
-//        }
-//    }
+    static void logical() {
+        Token t = tokenList.get(tokenIndex);
+        if (t.type.equals(TokenType.GREATER)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpMore());
+        }
+        if (t.type.equals(TokenType.LESS)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpLess());
+        }
+        if (t.type.equals(TokenType.EQUALS)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpEqual());
+        }
+        if (t.type.equals(TokenType.NEGATE)) {
+            tokenIndex++;
+            part();
+            sum();
+            intermediateRepresentation.add(new OpLogicalNeg());
+        }
+    }
 
     static void part() {
         unary();
@@ -900,7 +952,7 @@ public class Eden {
     }
 
     static int calculateShift(String type) {
-        return type.equals("bool") ? 1 : 4;
+        return 4;
     }
 
     static int getUniqueIndex() {
@@ -1354,6 +1406,219 @@ public class Eden {
         }
     }
 
+    static class OpLabel implements Op {
+        private final String label;
+
+        public OpLabel(String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return this.label;
+        }
+
+        @Override
+        public void interpret() {
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpLabel: ").append(label);
+            programCode.append("\n").append(label).append(":");
+        }
+    }
+
+    static class OpGoto implements Op {
+        private final String label;
+
+        public OpGoto(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public void interpret() {
+            int indexToGo = -1;
+            for (int i = 0; i < intermediateRepresentation.size(); i++) {
+                Op op = intermediateRepresentation.get(i);
+                if (op instanceof OpLabel) {
+                    if (((OpLabel) op).getLabel().equals(label)) {
+                        indexToGo = i;
+                        break;
+                    }
+                }
+            }
+            irPointer = indexToGo;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpGoto: ").append(label);
+            programCode.append("\n\tJMP ").append(label);
+        }
+    }
+
+    static class OpIfGoto implements Op {
+        private final String label;
+
+        public OpIfGoto(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public void interpret() {
+            boolean jumpNotEqualZero = String.valueOf(programStack.pop()).equals("1");
+            int index = -1;
+            if (jumpNotEqualZero) {
+                for (int i = 0; i < intermediateRepresentation.size(); i++) {
+                    Op op = intermediateRepresentation.get(i);
+                    if (op instanceof OpLabel) {
+                        if (((OpLabel) op).getLabel().equals(label)) {
+                            index = i;
+                            break;
+                        }
+                    }
+                }
+                irPointer = index;
+                return;
+            }
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpIfGoto: ").append(label);
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCMP eax, 0");
+            programCode.append("\n\tJNE ").append(label);
+        }
+    }
+
+    static class OpMore implements Op {
+
+        @Override
+        public void interpret() {
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            if (a > b) {
+                programStack.push(1);
+            } else {
+                programStack.push(0);
+            }
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            int uniqueIndex = getUniqueIndex();
+            String uniqueLabelStart = String.format("greater_st_%d", uniqueIndex);
+            String uniqueLabelEnd = String.format("greater_end_%d", uniqueIndex);
+            programCode.append("\n;OpLess: ");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCMP eax, ebx");
+            programCode.append("\n\tJG ").append(uniqueLabelStart);
+            programCode.append("\n\tPUSH 0");
+            programCode.append("\n\tJMP ").append(uniqueLabelEnd);
+            programCode.append("\n").append(uniqueLabelStart).append(":");
+            programCode.append("\n\tMOV eax, 0");
+            programCode.append("\n\tNOT eax");
+            programCode.append("\n\tADD eax, 2");
+            programCode.append("\n\tPUSH eax");
+            programCode.append("\n").append(uniqueLabelEnd).append(":");
+        }
+    }
+
+    static class OpLess implements Op {
+
+        @Override
+        public void interpret() {
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            if (a < b) {
+                programStack.push(1);
+            } else {
+                programStack.push(0);
+            }
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            int uniqueIndex = getUniqueIndex();
+            String uniqueLabelStart = String.format("less_st_%d", uniqueIndex);
+            String uniqueLabelEnd = String.format("less_end_%d", uniqueIndex);
+            programCode.append("\n;OpLess: ");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCMP eax, ebx");
+            programCode.append("\n\tJL ").append(uniqueLabelStart);
+            programCode.append("\n\tPUSH 0");
+            programCode.append("\n\tJMP ").append(uniqueLabelEnd);
+            programCode.append("\n").append(uniqueLabelStart).append(":");
+            programCode.append("\n\tMOV eax, 0");
+            programCode.append("\n\tNOT eax");
+            programCode.append("\n\tADD eax, 2");
+            programCode.append("\n\tPUSH eax");
+            programCode.append("\n").append(uniqueLabelEnd).append(":");
+        }
+    }
+
+    static class OpEqual implements Op {
+
+        @Override
+        public void interpret() {
+            int b = Integer.parseInt(String.valueOf(programStack.pop()));
+            int a = Integer.parseInt(String.valueOf(programStack.pop()));
+            if (a == b) {
+                programStack.push(1);
+            } else {
+                programStack.push(0);
+            }
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            int uniqueIndex = getUniqueIndex();
+            String uniqueLabelStart = String.format("equal_st_%d", uniqueIndex);
+            String uniqueLabelEnd = String.format("equal_end_%d", uniqueIndex);
+            programCode.append("\n;OpEqual: ");
+            programCode.append("\n\tPOP ebx");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tCMP eax, ebx");
+            programCode.append("\n\tJZ ").append(uniqueLabelStart);
+            programCode.append("\n\tPUSH 0");
+            programCode.append("\n\tJMP ").append(uniqueLabelEnd);
+            programCode.append("\n").append(uniqueLabelStart).append(":");
+            programCode.append("\n\tMOV eax, 0");
+            programCode.append("\n\tNOT eax");
+            programCode.append("\n\tADD eax, 2");
+            programCode.append("\n\tPUSH eax");
+            programCode.append("\n").append(uniqueLabelEnd).append(":");
+        }
+    }
+
+    static class OpLogicalNeg implements Op {
+
+        @Override
+        public void interpret() {
+            boolean a = String.valueOf(programStack.pop()).equals("1");
+            int res = a ? 0 : 1;
+            programStack.push(res);
+            irPointer++;
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpLogicalNeg: ");
+            programCode.append("\n\tPOP eax");
+            programCode.append("\n\tNOT eax");
+            programCode.append("\n\tADD eax, 2"); // FALSE IS 0, TRUE IS 1.
+            programCode.append("\n\tPUSH eax");
+        }
+    }
+
     static class OpPushTrue implements Op {
 
         @Override
@@ -1626,6 +1891,7 @@ public class Eden {
         GREATER,
         LESS,
         EQUALS,
+        NEGATE,
         L_SHIFT,
         R_SHIFT,
         B_AND,
@@ -1965,6 +2231,10 @@ public class Eden {
                 }
                 case ':': {
                     tokenList.add(new Token(TokenType.WIN_CALL_SYMBOL, currentChar, new Location(line, column)));
+                    break;
+                }
+                case '!': {
+                    tokenList.add(new Token(TokenType.NEGATE, currentChar, new Location(line, column)));
                     break;
                 }
                 default: {

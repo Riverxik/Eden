@@ -1,0 +1,24 @@
+class WhileLoop {
+    func void main() {
+        int i;
+        // We may or may not use phantasies.
+        while i < 5 {
+            ~ "Print this 5 times\n";
+            i = i + 1;
+        }
+        while i > 2 {
+            ~ "Print this 3 times\n";
+            i = i - 1;
+        }
+        // This phantasies required for check != condition.
+        while !(i = 0) {
+            ~ "Print this 2 times\n";
+            i = i - 1;
+        }
+        while (i = 0) {
+            ~ "Print this ones\n";
+            i = i + 1;
+        }
+        ~ "Done";
+    }
+}
