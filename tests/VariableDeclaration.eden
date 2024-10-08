@@ -1,8 +1,10 @@
 class VariableDeclaration {
     func void main() {
         int a, b = 8;
+        bool log = true;
         ~ a; // 0
         ~ b;
+        ~ log; // 1
         a = b - 6;
         ~ a; // a = 2
         int c = a + b;
