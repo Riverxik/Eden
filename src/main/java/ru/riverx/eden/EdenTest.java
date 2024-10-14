@@ -6,7 +6,7 @@ import java.nio.file.Paths;
 import java.util.Objects;
 
 public class EdenTest {
-    public static final String EXIT_CODE_SEPARATOR = ";\n";
+    public static final String EXIT_CODE_SEPARATOR = ";\r\n";
     private static boolean isCaptureMode = false;
     private static boolean isFullTesting = false;
     public static void main(String[] args) throws IOException, InterruptedException {
