@@ -1,0 +1,5 @@
+class Eden {
+    func void main() {
+        ~ "Hello, Eden\n";
+    }
+}

@@ -1,0 +1,40 @@
+class Conditions {
+    func void main() {
+        singleIf(7);
+        singleIf(3);
+        ifWithElse(7);
+        ifWithElse(3);
+        int i = 4;
+        while i < 7 {
+            ifWithNestedElse(i);
+            i = i + 1;
+        }
+    }
+
+    func void singleIf(int number) {
+        if number < 5 {
+            ~ "Number is less than 5\n";
+        }
+    }
+
+    func void ifWithElse(int number) {
+        if number < 5 {
+            ~ "Number is less than 5\n";
+        } else {
+            ~ "Number is more than 5\n";
+        }
+    }
+
+    func void ifWithNestedElse(int number) {
+        ~ number;
+        if number < 5 {
+            ~ " Number is less than 5\n";
+        } else {
+            if number > 5 {
+                ~ " Number is more than 5\n";
+            } else {
+                ~ " Number is 5\n";
+            }
+        }
+    }
+}
