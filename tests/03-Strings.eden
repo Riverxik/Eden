@@ -1,4 +1,0 @@
-string firstString = "Hello, i'm Eden\n";
-string second = "Hello Eden";
-~ firstString;
-~ second;

@@ -1,0 +1,26 @@
+class Fibonacci {
+    func void main() {
+        int n = 8;
+        int i;
+        ~ "Factorial of "; ~ n; ~ ": "; ~ factorial(n); ~ "\n";
+        ~ "Fibonacci of "; ~ n; ~ ": ";
+        while i < n {
+            ~ fibonacci(i); ~ " ";
+            i = i + 1;
+        }
+    }
+
+    func int factorial(int n) {
+        if n = 0 {
+            return 1;
+        }
+        return n * factorial(n - 1);
+    }
+
+    func int fibonacci(int n) {
+        if n = 0 | n = 1 {
+            return n;
+        }
+        return (fibonacci(n - 1) + fibonacci(n - 2));
+    }
+}
