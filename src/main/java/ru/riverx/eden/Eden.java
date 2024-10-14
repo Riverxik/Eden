@@ -108,7 +108,8 @@ public class Eden {
         Process process = Runtime.getRuntime().exec("cmd.exe /c " + execCmd);
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            System.err.println("Error while execute command: " + execCmd + "\n" + readInputStream(process.getErrorStream()));
+            System.err.println("Error while execute command: " + execCmd + "\n" +
+                    readInputStream(process.getErrorStream().available() != 0 ? process.getErrorStream() : process.getInputStream()));
         }
         return readInputStream(process.getInputStream());
     }
@@ -555,6 +556,24 @@ public class Eden {
         return count;
     }
 
+    static int expectWinCallExpressionList() {
+        if (hasNextTokenValues(";")) {
+            return 0;
+        }
+        int count = 1;
+        expectExpression();
+        while (!hasNextTokenValues(";")) {
+            if (hasNextTokenValues(",")) {
+                expectTokenType(TokenType.COMMA);
+                expectExpression();
+                count++;
+            } else {
+                printErr("Expected expression list, but found EOF");
+            }
+        }
+        return count;
+    }
+
     static int expectParametersDec() {
         int count = 0;
         int shift = 0;
@@ -895,10 +914,29 @@ public class Eden {
         } else if (t.type.equals(TokenType.KEYWORD)) {
             if (t.value.equals("true")) {
                 intermediateRepresentation.add(new OpPushTrue());
+                tokenIndex++;
             } else if (t.value.equals("false")) {
                 intermediateRepresentation.add(new OpPushFalse());
+                tokenIndex++;
+            } else if (t.value.equals("win")) {
+                expectKeyword("win");
+                expectTokenType(TokenType.WIN_CALL_SYMBOL);
+                int nArgs = expectWinCallExpressionList();
+                if (nArgs != 0) {
+                    List<Op> tmpList = new ArrayList<>();
+                    for (int i = intermediateRepresentation.size() - 1, c = 0; c < nArgs; c++, i--) {
+                        tmpList.add(intermediateRepresentation.get(i));
+                        intermediateRepresentation.remove(i);
+                    }
+                    intermediateRepresentation.addAll(tmpList);
+                }
+                Op lastOp = intermediateRepresentation.get(intermediateRepresentation.size() - 1);
+                assert lastOp instanceof OpPushString;
+                String winCallName = ((OpPushString)lastOp).getValue();
+                intermediateRepresentation.remove(lastOp);
+                if (!externWinCallList.contains(winCallName)) { externWinCallList.add(winCallName); }
+                intermediateRepresentation.add(new OpWinCall(winCallName, nArgs));
             }
-            tokenIndex++;
         }
         // TODO
     }
@@ -1195,6 +1233,28 @@ public class Eden {
         }
     }
 
+    static class OpWinCall implements Op {
+        private final String callName;
+        private final int nArgs;
+
+        public OpWinCall(String callName, int nArgs) {
+            this.callName = callName;
+            this.nArgs = nArgs;
+        }
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpWinCall: ").append(callName).append(":").append(nArgs);
+            programCode.append("\n\tCALL ").append(callName);
+            programCode.append("\n\tPUSH EAX");
+        }
+    }
+
     static class OpReturn implements Op {
 
         @Override
@@ -1313,6 +1373,10 @@ public class Eden {
             stringConstants.add(value);
             programCode.append("\n;OpPushString: ").append(value);
             programCode.append("\n\tPUSH ").append(cmpName);
+        }
+
+        public String getValue() {
+            return this.value;
         }
     }
 

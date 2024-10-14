@@ -1,0 +1,39 @@
+class WinCalls {
+    func void main() {
+        writeToConsole();
+        readFromUser();
+    }
+
+    func void readFromUser() {
+        int stdIn = -10;
+        int bufferSize = 50; // 50 bytes is enough for name.
+        int heapZeroMemory = 8; // Just a constant, for zero initializing memory.
+        int numOfBytesRead;
+        int hHeap = win:"GetProcessHeap";
+        int hReadBuf = win:"HeapAlloc", hHeap, heapZeroMemory, bufferSize; // Allocate memory for buffer.
+        ~ "What is your name?\n";
+        int hConIn = win:"GetStdHandle", stdIn;
+        int resultCode = win:"ReadFile", hConIn, hReadBuf, bufferSize, numOfBytesRead, 0;
+        getResult(resultCode);
+        ~ "Hello, "; ~ hReadBuf;
+        resultCode = win:"HeapFree", hHeap, 1, hReadBuf; // Free the memory block.
+        getResult(resultCode);
+    }
+
+    func void writeToConsole() {
+        int stdOutHandle;       // Std out handler
+        int writtenBuff;        // Buffer for writing to
+        int sizeToWrite = 13;   // How many bytes write to handler
+        int resultCode;         // Returned code for operation
+        int stdOutCode = -11;
+        stdOutHandle = win:"GetStdHandle", stdOutCode;
+        resultCode = win:"WriteFile", stdOutHandle, "Hello world\n", 13, writtenBuff, 0;
+        getResult(resultCode);
+    }
+
+    func void getResult(int resultCode) {
+        if (resultCode = 0) {
+            ~ "Error with code: "; ~ resultCode; ~ "\n";
+        }
+    }
+}
