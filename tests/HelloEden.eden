@@ -1,4 +1,4 @@
-class Eden {
+class HelloEden {
     func void main() {
         ~ "Hello, Eden\n";
     }

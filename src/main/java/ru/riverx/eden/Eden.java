@@ -12,7 +12,7 @@ import java.util.*;
 /**
  * I will try to make Eden self-hosted as soon as possible, so forgive me for this mess
  * I will try it without OOP style. After I self-hosted it I will refactor all of this. Maybe, maybe not.
- * I just started and i see that it's really hard to do without OOP features and stuff...
+ * I just started and I see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
 //    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
