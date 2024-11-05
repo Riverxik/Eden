@@ -97,10 +97,20 @@ public class Eden {
                 System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
             }
         } else {
+            irPointer = getIrPointerMainFunc();
             while (irPointer >= 0) {
                 intermediateRepresentation.get(irPointer).interpret();
             }
         }
+    }
+
+    private static int getIrPointerMainFunc() {
+        for (Op op : intermediateRepresentation) {
+            if (op instanceof OpFunc && ((OpFunc)op).getName().equals(mainFuncName)) {
+                return intermediateRepresentation.indexOf(op);
+            }
+        }
+        return 0;
     }
 
     private static String run(String execCmd) throws IOException, InterruptedException {
@@ -366,14 +376,56 @@ public class Eden {
 //    }
 
     static void parse() {
-        parseClass();
+        parseProgram();
         checkForMainFunc();
+    }
+
+    static void parseProgram() {
+        parseLibs();
+        parseClass();
+    }
+
+    static void parseLibs() {
+        if (!hasNextTokenValues("use")) {
+            return;
+        }
+        expectKeyword("use");
+
+        Token t = tokenList.get(tokenIndex);
+        if (!t.type.equals(TokenType.STRING)) {
+            printErrToken(t, "Filename for include must be string");
+        }
+        tokenIndex++;
+        expectTokenType(TokenType.SEMICOLON);
+        String sourceName = String.valueOf(t.value);
+        if (sourceName.isEmpty()) {
+            printErrToken(t, "Filename for include is empty");
+            return;
+        }
+        Path sourcePath = Paths.get(sourceName + ".eden");
+        if (!Files.exists(sourcePath)) {
+            System.out.println("File does not exists: " + sourceName);
+            System.exit(1);
+        }
+        try {
+            String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+            // Lexing.
+            List<Token> customTokenList = new ArrayList<>();
+            Lexer lexer = new Lexer(source, customTokenList);
+            lexer.tokenize();
+            lexer.clearComments();
+            customTokenList.remove((customTokenList).size() - 1); // Remove EOF
+            tokenList.addAll(tokenIndex, customTokenList);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        parseProgram();
     }
 
     static void checkForMainFunc() {
         boolean isMain = false;
         for (String name : subroutineNames) {
-            if (name.split("[.]")[1].equals("Eden_main")) {
+            if (name.equals(currentClassName + ".Eden_main")) {
                 isMain = true;
                 mainFuncName = name;
                 break;

@@ -1,0 +1,8 @@
+use "tests\\Functions";
+
+class Include {
+    func void main() {
+        int a = Functions.sum(34, 35); // a + b + 1
+        ~ a; // 70;
+    }
+}
