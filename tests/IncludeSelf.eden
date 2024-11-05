@@ -1,0 +1,5 @@
+use "tests\\IncludeSelf";
+
+class IncludeSelf {
+    // Compiler should not allow include class by itself.
+}

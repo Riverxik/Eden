@@ -29,6 +29,7 @@ public class Eden {
     static List<SymbolTableElem> symbolTable = new ArrayList<>();
     static int localVarShift = 0;
     static List<SymbolTableElem> usedVariables = new ArrayList<>();
+    static List<String> usedClasses = new ArrayList<>();
     static List<String> subroutineNames = new ArrayList<>();
     static String mainFuncName;
     static int uniqueIndex = 0;
@@ -80,6 +81,7 @@ public class Eden {
         Lexer lexer = new Lexer(source, tokenList);
         lexer.tokenize();
         lexer.clearComments();
+        usedClasses.add(sourceName);
 
         //tokenList.forEach(System.out::println);
 
@@ -398,6 +400,12 @@ public class Eden {
         tokenIndex++;
         expectTokenType(TokenType.SEMICOLON);
         String sourceName = String.valueOf(t.value);
+        if (usedClasses.contains(sourceName)) {
+            printErrToken(t, "Class already included: " + sourceName);
+        } else {
+            usedClasses.add(sourceName);
+        }
+
         if (sourceName.isEmpty()) {
             printErrToken(t, "Filename for include is empty");
             return;
