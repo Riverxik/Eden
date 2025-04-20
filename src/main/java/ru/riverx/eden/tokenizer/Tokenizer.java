@@ -7,7 +7,7 @@ import java.util.List;
 public class Tokenizer {
 
     private static final String[] KEYWORDS = {
-            "use", "class", "new", "func", "method", "field",
+            "use", "class", "constructor", "func", "method", "field",
             "static", "var", "int", "char", "boolean", "void",
             "win", "true", "false", "null", "this", "asm",
             "let", "do", "if", "else", "while", "return"
