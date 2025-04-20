@@ -22,24 +22,18 @@ public class OpPush implements VM2Asm {
 
     @Override
     public String getAsmCode() {
-        if (segment.equals("static")) {
-            return "PUSH static " + filename + ", " + index;
-        }
-        return "PUSH " + segment + " " + index;
-//        switch (segment) {
-//            case "constant": { return getCodeConstByIndex(index); }
+        String res = "; Push " + segment + " " + index;
+        switch (segment) {
+            case "constant": { return res + "\n\tpush " + index; }
 //            case "static": { return "PUSH DWORD " + filename + index; }
 //            case "temp": { return "MOV EAX, tempSeg\nADD " + index + "\nPUSH EAX"; }
 //            case "pointer": { return index == 0 ? "PUSH thisSeg" : "PUSH thatSeg"; }
-//            case "local": { return "PUSH localSeg"; }
+            case "local": { return res + "\n\tmov dword eax, [eden_lcl]\n\tsub eax, " + (index+1)*4 + "\n\tpush dword [eax]"; }
+
 //            case "argument": { return "PUSH argSeg"; }
 //            case "this": { return "PUSH thisSeg"; }
 //            case "that": { return "PUSH thatSeg"; }
-//            default: throw new UnknownSegmentException("Unknown segment type: " + segment);
-//        }
+            default: throw new UnknownSegmentException("Unknown segment type: " + segment);
+        }
     }
-
-//    private String getCodeConstByIndex(int index) {
-//        return "push edx\nxor edx, edx\nmov eax, " + index + "\nimul eax, 4\npop edx\npush eax";
-//    }
 }

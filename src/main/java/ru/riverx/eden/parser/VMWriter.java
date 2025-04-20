@@ -18,21 +18,18 @@ public class VMWriter {
 
     // segment: CONST, ARG, LOCAL, STATIC, THIS, THAT, POINTER, TEMP
     public void writePush(String segment, int index) {
-        //vmCode.add(new OpPush(segment, index));
-        System.out.printf("Push: %s, %d%n", segment, index);
+        vmCode.add(new OpPush(segment, index));
     }
 
     public void writePop(String segment, int index) {
-        //vmCode.add(new OpPop(segment, index));
-        System.out.printf("Pop: %s, %d%n", segment, index);
+        vmCode.add(new OpPop(segment, index));
     }
 
     public void writeArithmetic(VMCommand cmd) {
-        System.out.printf("Arithmetic: %s%n", cmd);
-//        switch (cmd) {
-//            case ADD: vmCode.add("add"); break;
+        switch (cmd) {
+            case ADD: vmCode.add(new OpAdd()); break;
 //            case SUB: vmCode.add("sub"); break;
-//            case NEG: vmCode.add("neg"); break;
+            case NEG: vmCode.add(new OpNeg()); break;
 //            case EQ: vmCode.add("eq"); break;
 //            case GT: vmCode.add("gt"); break;
 //            case LT: vmCode.add("lt"); break;
@@ -41,8 +38,8 @@ public class VMWriter {
 //            case NOT: vmCode.add("not"); break;
 //            case MULTIPLY: writeCall("Math.multiply", 2); break;
 //            case DIVIDE: writeCall("Math.divide", 2); break;
-//            default: throw new IllegalArgumentException("Not implemented cmd: " + cmd);
-//        }
+            default: throw new IllegalArgumentException("Not implemented cmd: " + cmd);
+        }
     }
 
     public void writeConstant(String constant) {
@@ -65,8 +62,7 @@ public class VMWriter {
     }
 
     public void writeCall(String name, int nArgs) {
-        System.out.printf("Call %s with %d args%n", name, nArgs);
-        //vmCode.add("call " + name + " " + nArgs);
+        vmCode.add(new OpCall(name, nArgs));
     }
 
     public void writeFunction(String name, int nLocals) {

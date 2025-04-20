@@ -10,6 +10,6 @@ public class OpPushConstant implements VM2Asm {
 
     @Override
     public String getAsmCode() {
-        return "\tpush " + constant;
+        return "; Push " + constant + "\n\tpush " + constant;
     }
 }

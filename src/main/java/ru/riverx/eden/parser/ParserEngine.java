@@ -1,8 +1,10 @@
 package ru.riverx.eden.parser;
 
+import ru.riverx.eden.exceptions.NoMainFuncException;
 import ru.riverx.eden.parser.high.SymbolKind;
 import ru.riverx.eden.parser.high.SymbolTable;
 import ru.riverx.eden.parser.high.Variable;
+import ru.riverx.eden.parser.middle.OpCall;
 import ru.riverx.eden.parser.middle.OpFunctionInfo;
 import ru.riverx.eden.parser.middle.VM2Asm;
 import ru.riverx.eden.parser.middle.VMCommand;
@@ -22,6 +24,8 @@ public class ParserEngine {
     public static final String LET = "let";
     public static final String POINTER = "pointer";
     public static final String ARGUMENT = "argument";
+    public static final String TEMP = "temp";
+    public static final String THAT = "that";
 
     private final List<String> primTypes = Arrays.asList("int", "char", "boolean");
     private final List<String> primFuncTypes = Arrays.asList("int", "char", "boolean", "void");
@@ -48,7 +52,7 @@ public class ParserEngine {
         parseClass();
         this.compilationTime = System.currentTimeMillis() - start;
         validateMain();
-        printCompileInfo();
+        printTranslateInfo();
     }
 
     private void validateMain() {
@@ -59,6 +63,9 @@ public class ParserEngine {
                     mainFuncName = funcName;
                 }
             }
+        }
+        if (mainFuncName == null || mainFuncName.isEmpty()) {
+            throw new NoMainFuncException("ERROR: Your program must have main function");
         }
     }
 
@@ -80,7 +87,33 @@ public class ParserEngine {
         asmCode.add("global Start\n");
         asmCode.add("section .data");
         asmCode.add("section .bss");
+        asmCode.add("\teden_sp resd 1");
+        asmCode.add("\teden_lcl resd 1");
+        asmCode.add("\teden_arg resd 1");
+        asmCode.add("\teden_this resd 1");
+        asmCode.add("\teden_that resd 1");
+        asmCode.add("\teden_r13 resd 1");
         asmCode.add("section .text");
+        // call return label
+        asmCode.add("eden_return:");
+        // put return value that is on eax in [arg]
+        asmCode.add("\tmov dword ebx, [eden_arg]");
+        asmCode.add("\tmov dword [ebx], eax");
+        // save new sp for calling function in ebx
+        asmCode.add("\tmov dword ebx, [eden_arg]");
+        // set sp as local
+        asmCode.add("\tmov dword esp, [eden_lcl]");
+        // pop that, this, arg, lcl
+        asmCode.add("\tpop dword [eden_that]");
+        asmCode.add("\tpop dword [eden_this]");
+        asmCode.add("\tpop dword [eden_arg]");
+        asmCode.add("\tpop dword [eden_lcl]");
+        // pop return address into eax
+        asmCode.add("\tpop eax");
+        // set correct esp now
+        asmCode.add("\tmov esp, ebx");
+        // jump to return address
+        asmCode.add("\tjmp eax");
         asmCode.add("; CODE GENERATION ");
     }
 
@@ -88,8 +121,14 @@ public class ParserEngine {
         asmCode.add("; CODE GENERATION END ");
         asmCode.add("; User program entry point ");
         asmCode.add("Start:");
-        asmCode.add("\tcall " + mainFuncName + "\n");
+        asmCode.add("\tmov [eden_lcl], esp");
+        asmCode.add("\tmov [eden_arg], esp");
+        asmCode.add("\tsub dword [eden_arg], 4");
+        //asmCode.add("\tmov eax, eden_exit");
+        asmCode.add(new OpCall(mainFuncName, 0).getAsmCode());
+        //asmCode.add("\tcall " + mainFuncName + "\n");
         asmCode.add("; End of program");
+        asmCode.add("eden_exit:");
         asmCode.add("\tpush 0");
         asmCode.add("\tcall _ExitProcess@4");
     }
@@ -101,9 +140,10 @@ public class ParserEngine {
         return filename.split("[.]")[0];
     }
 
-    private void printCompileInfo() {
+    private void printTranslateInfo() {
         if (errorCount > 0) {
             System.err.printf("[%s] Translating failed with %d errors!%n", className, errorCount);
+            System.exit(1);
         } else {
             System.out.printf("[%s] Translation done in %d ms%n", className, compilationTime);
         }
@@ -279,10 +319,10 @@ public class ParserEngine {
         expectTokenValue("="); acceptToken();
         parseExpression();
         if (isArray) {
-            writer.writePop("temp", 0);
+            writer.writePop(TEMP, 0);
             writer.writePop(POINTER, 1);
-            writer.writePush("temp", 0);
-            writer.writePop("that", 0);
+            writer.writePush(TEMP, 0);
+            writer.writePop(THAT, 0);
         } else {
             writer.writePop(variable.getKind(), variable.getIndex());
         }
@@ -342,7 +382,7 @@ public class ParserEngine {
         expectTokenValue(DO); acceptToken();
         subroutineCall();
         expectTokenValue(";"); acceptToken();
-        writer.writePop("temp", 0); // We don't need to store result in 'do' statement.
+        writer.writePop(TEMP, 0); // We don't need to store result in 'do' statement.
     }
 
     private void parseReturn() {
@@ -403,13 +443,13 @@ public class ParserEngine {
                     if (value.equals("=")) {
                         acceptToken();
                         parseExpression();
-                        writer.writePop("temp", 0);
+                        writer.writePop(TEMP, 0);
                         writer.writePop(POINTER, 1);
-                        writer.writePush("temp", 0);
-                        writer.writePop("that", 0);
+                        writer.writePush(TEMP, 0);
+                        writer.writePop(THAT, 0);
                     } else {
                         writer.writePop(POINTER, 1);
-                        writer.writePush("that", 0);
+                        writer.writePush(THAT, 0);
                     }
                 } else if (value.equals(".") || value.equals("(")) {
                     subroutineCall();

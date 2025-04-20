@@ -4,6 +4,6 @@ public class OpReturn implements VM2Asm {
 
     @Override
     public String getAsmCode() {
-        return "\tpop eax\n\tret";
+        return "; OpReturn\n\tpop eax\n\tjmp eden_return";
     }
 }
