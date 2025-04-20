@@ -99,10 +99,11 @@ public class Eden {
                 System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
             }
         } else {
-            irPointer = getIrPointerMainFunc();
-            while (irPointer >= 0) {
-                intermediateRepresentation.get(irPointer).interpret();
-            }
+            // Temporary disable interpretation.
+//            irPointer = getIrPointerMainFunc();
+//            while (irPointer >= 0) {
+//                intermediateRepresentation.get(irPointer).interpret();
+//            }
         }
     }
 
@@ -172,7 +173,12 @@ public class Eden {
         fw.write("extern GetStdHandle\n" +
                      "extern WriteFile\n" +
                      "extern ExitProcess\n" +
+                     "extern HeapAlloc\n" +
+                     "extern HeapFree\n" +
+                     "extern GetProcessHeap\n" +
                      "\n" +
+                     "global eden_alloc\n" +
+                     "global eden_free\n" +
                      "global Start\n");
     }
 
@@ -213,6 +219,24 @@ public class Eden {
 
     static void writeText(FileWriter fw) throws IOException {
         fw.write("section .text\n");
+        // Eden Alloc
+        fw.write(";Expects a number on the stack - how much bytes allocate\n");
+        fw.write("eden_alloc:\n");
+        fw.write("\tpush    dword [esp+4]\n");      // ; size
+        fw.write("\tpush    0\n");                  // ; flags (0 = default)
+        fw.write("\tcall    GetProcessHeap\n");
+        fw.write("\tpush    eax\n");                // ; heap handle
+        fw.write("\tcall    HeapAlloc\n");
+        fw.write("\tret\n");
+        // Eden Free
+        fw.write(";Expects a pointer on the stack - to de-allocate memory\n");
+        fw.write("eden_free:\n");
+        fw.write("\tpush    dword [esp+4]\n");      //   ; ptr
+        fw.write("\tpush    0\n");                  //   ; flags
+        fw.write("\tcall    GetProcessHeap\n");
+        fw.write("\tpush    eax\n");                // ; heap handle
+        fw.write("\tcall    HeapFree\n");
+        fw.write("\tret\n");
         // RetFromLogic
         fw.write("retFrom:\n");
         fw.write("\tret\n");
@@ -746,6 +770,12 @@ public class Eden {
         return localVarCount;
     }
 
+    static void expectAllocStatement() {
+        expectKeywords("alloc");
+        expectExpression();
+        intermediateRepresentation.add(new OpEdenAlloc());
+    }
+
     static void expectReturnStatement() {
         expectExpression();
         intermediateRepresentation.add(new OpReturn());
@@ -785,7 +815,11 @@ public class Eden {
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
         tokenIndex++; // =
         intermediateRepresentation.add(opPushVar);
-        expectExpression();
+        if (hasNextTokenValues("alloc")) {
+            expectAllocStatement();
+        } else {
+            expectExpression();
+        }
         intermediateRepresentation.add(opAssign);
     }
 
@@ -1311,6 +1345,23 @@ public class Eden {
         public void generate() {
             programCode.append("\n;OpWinCall: ").append(callName).append(":").append(nArgs);
             programCode.append("\n\tCALL ").append(callName);
+            programCode.append("\n\tPUSH EAX");
+        }
+    }
+
+    static class OpEdenAlloc implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpEdenAlloc:");
+            programCode.append("\n\tCALL eden_alloc");
+            programCode.append("\n\tADD ESP, 4");
+            programCode.append("\n\tMOV EBX, EAX");
             programCode.append("\n\tPUSH EAX");
         }
     }
@@ -2286,6 +2337,7 @@ public class Eden {
             keywordList.add("true");
             keywordList.add("false");
             keywordList.add("win");
+            keywordList.add("alloc");
         }
 
         void clearComments() {
