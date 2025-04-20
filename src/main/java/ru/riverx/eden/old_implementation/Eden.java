@@ -1,4 +1,4 @@
-package ru.riverx.eden;
+package ru.riverx.eden.old_implementation;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
