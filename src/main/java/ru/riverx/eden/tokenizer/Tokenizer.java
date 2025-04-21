@@ -8,8 +8,8 @@ public class Tokenizer {
 
     private static final String[] KEYWORDS = {
             "use", "class", "constructor", "func", "method", "field",
-            "static", "var", "int", "char", "boolean", "void",
-            "win", "true", "false", "null", "this", "asm",
+            "static", "var", "int", "char", "boolean", "void", "win",
+            "true", "false", "null", "this", "asm", "alloc", "free",
             "let", "do", "if", "else", "while", "return"
     };
     private static final String SYMBOLS = "{}()[].,;:+-*/&|<>=~";

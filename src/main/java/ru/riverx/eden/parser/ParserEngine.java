@@ -18,6 +18,9 @@ public class ParserEngine {
 
     public static final String CONSTANT = "constant";
     public static final String RETURN = "return";
+    public static final String WIN = "win";
+    public static final String ALLOC = "alloc";
+    public static final String FREE = "free";
     public static final String DO = "do";
     public static final String WHILE = "while";
     public static final String IF = "if";
@@ -83,7 +86,10 @@ public class ParserEngine {
     }
 
     private void writeHeader(List<String> asmCode) {
-        asmCode.add("extern _ExitProcess@4\n");
+        asmCode.add("extern ExitProcess\n");
+        asmCode.add("extern GetProcessHeap\n");
+        asmCode.add("extern HeapAlloc\n");
+        asmCode.add("extern HeapFree\n");
         asmCode.add("global Start\n");
         asmCode.add("section .data");
         asmCode.add("section .bss");
@@ -94,6 +100,47 @@ public class ParserEngine {
         asmCode.add("\teden_that resd 1");
         asmCode.add("\teden_r13 resd 1");
         asmCode.add("section .text");
+        // Eden Alloc
+        asmCode.add(";Expects a number on the stack - how much bytes allocate");
+        asmCode.add("eden_alloc:");
+        asmCode.add("\tpush eax");
+        asmCode.add("\tpush dword [eden_lcl]\n\tpush dword [eden_arg]");
+        asmCode.add("\tpush dword [eden_this]\n\tpush dword [eden_that]");
+        asmCode.add("\tmov dword eax, [eden_r13]");
+        asmCode.add("\tadd eax, 20");
+        asmCode.add("\tmov ebx, esp");
+        asmCode.add("\tadd ebx, eax");
+        asmCode.add("\tmov dword [eden_arg], ebx");
+        asmCode.add("\tsub dword [eden_arg], 4");
+        asmCode.add("\tmov dword [eden_lcl], esp");
+        asmCode.add("; THINK DOWN HERE");
+        asmCode.add("\tmov dword eax, [eden_arg]");
+        asmCode.add("\tpush    dword [eax]");        // ; size
+        asmCode.add("\tpush    0");                  // ; flags (0 = default)
+        asmCode.add("\tcall    GetProcessHeap");
+        asmCode.add("\tpush    eax");                // ; heap handle
+        asmCode.add("\tcall    HeapAlloc");
+        asmCode.add("\tjmp eden_return");
+        // Eden Free
+        asmCode.add(";Expects a pointer on the stack - to de-allocate memory");
+        asmCode.add("eden_free:");
+        asmCode.add("\tpush eax");
+        asmCode.add("\tpush dword [eden_lcl]\n\tpush dword [eden_arg]");
+        asmCode.add("\tpush dword [eden_this]\n\tpush dword [eden_that]");
+        asmCode.add("\tmov dword eax, [eden_r13]");
+        asmCode.add("\tadd eax, 20");
+        asmCode.add("\tmov ebx, esp");
+        asmCode.add("\tadd ebx, eax");
+        asmCode.add("\tmov dword [eden_arg], ebx");
+        asmCode.add("\tsub dword [eden_arg], 4");
+        asmCode.add("\tmov dword [eden_lcl], esp");
+        asmCode.add("\tmov dword eax, [eden_arg]");
+        asmCode.add("\tpush    dword [eax]");        //   ; ptr
+        asmCode.add("\tpush    0");                  //   ; flags
+        asmCode.add("\tcall    GetProcessHeap");
+        asmCode.add("\tpush    eax");                // ; heap handle
+        asmCode.add("\tcall    HeapFree");
+        asmCode.add("\tjmp eden_return");
         // call return label
         asmCode.add("eden_return:");
         // put return value that is on eax in [arg]
@@ -124,13 +171,11 @@ public class ParserEngine {
         asmCode.add("\tmov [eden_lcl], esp");
         asmCode.add("\tmov [eden_arg], esp");
         asmCode.add("\tsub dword [eden_arg], 4");
-        //asmCode.add("\tmov eax, eden_exit");
         asmCode.add(new OpCall(mainFuncName, 0).getAsmCode());
-        //asmCode.add("\tcall " + mainFuncName + "\n");
         asmCode.add("; End of program");
         asmCode.add("eden_exit:");
         asmCode.add("\tpush 0");
-        asmCode.add("\tcall _ExitProcess@4");
+        asmCode.add("\tcall ExitProcess");
     }
 
     private String calculateClassName(String filename) {
@@ -502,6 +547,22 @@ public class ParserEngine {
             }
             case "this": {
                 writer.writePush(POINTER, 0);
+                break;
+            }
+            case ALLOC: {
+                expectTokenValue(ALLOC); acceptToken();
+                expectTokenValue("("); acceptToken();
+                int nArgs = parseExpressionList();
+                expectTokenValue(")"); // Does not accept here, cause after keyword constant acceptToken will call.
+                writer.writeCall("eden_alloc", nArgs);
+                break;
+            }
+            case FREE: {
+                expectTokenValue(FREE); acceptToken();
+                expectTokenValue("("); acceptToken();
+                int nArgs = parseExpressionList();
+                expectTokenValue(")"); // Does not accept here, cause after keyword constant acceptToken will call.
+                writer.writeCall("eden_free", nArgs);
                 break;
             }
             default:
