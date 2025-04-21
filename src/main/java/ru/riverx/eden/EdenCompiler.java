@@ -58,7 +58,7 @@ public class EdenCompiler {
     private static void writeToFile(String filename, List<String> codeLines) {
         try {
             String correctName = filename.split("[.]")[0] + ".asm";
-            Files.write(Paths.get(correctName), codeLines, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(Paths.get(correctName), codeLines, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
             System.err.printf("ERROR: can't write file %s to disk.%n%s", filename, e.getMessage());
         }
