@@ -27,13 +27,15 @@ public class OpPush implements VM2Asm {
             case "constant": { return res + "\n\tpush " + index; }
 //            case "static": { return "PUSH DWORD " + filename + index; }
 //            case "temp": { return "MOV EAX, tempSeg\nADD " + index + "\nPUSH EAX"; }
-            case "pointer": {
-                return res + "\n\tmov eax, " + (index == 0 ? "[eden_this]" : "[eden_that]") + "\n\tpush eax";
-            }
+            case "pointer": { return res + "\n\tmov eax, " + (index == 0 ? "[eden_this]" : "[eden_that]") + "\n\tpush eax"; }
             case "local": { return res + "\n\tmov dword eax, [eden_lcl]\n\tsub eax, " + (index+1)*4 + "\n\tpush dword [eax]"; }
             case "argument": { return res + "\n\tmov dword eax, [eden_arg]\n\tsub eax, " + index * 4 + "\n\tpush dword [eax]"; }
-//            case "this": { return "PUSH thisSeg"; }
-//            case "that": { return "PUSH thatSeg"; }
+            case "this": {
+                return res + "\n\tmov dword eax, [eden_this]\n\tadd eax, " + (index*4) + "\n\tpush dword [eax]";
+            }
+            case "that": {
+                return res + "\n\tmov dword eax, [eden_that]\n\tadd eax, " + (index*4) + "\n\tpush dword [eax]";
+            }
             default: throw new UnknownSegmentException("Unknown segment type: " + segment);
         }
     }
