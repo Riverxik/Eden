@@ -18,14 +18,21 @@ public class OpPop implements VM2Asm {
         sb.append("; Pop ").append(segment).append(" ").append(index).append("\n");
         sb.append("\tpop eax\n");
         switch (segment) {
-            case "local": {
-                sb.append("\tmov dword ebx, [eden_lcl]\n\tsub ebx, ").append((index+1)*4)
-                        .append("\n\tmov dword [ebx], eax");
+            // constant
+            // static
+            case "temp": {
+                if (index != 0) { throw new IllegalArgumentException("Only Pop temp 0 is allowed!"); } // Add shift by index if needed.
+                sb.append("\tmov dword ebx, eden_temp\n\tmov [ebx], eax");
             } break;
             case "pointer": {
                 sb.append("\tmov dword ebx, ").append(index == 0 ? "eden_this" : "eden_that")
                         .append("\n\tmov dword [ebx], eax");
             } break;
+            case "local": {
+                sb.append("\tmov dword ebx, [eden_lcl]\n\tsub ebx, ").append((index+1)*4)
+                        .append("\n\tmov dword [ebx], eax");
+            } break;
+            // argument
             case "this": {
                 sb.append("\tmov dword ebx, [eden_this]\n\tadd ebx, ").append(index*4).append("\n\tmov dword [ebx], eax");
             } break;

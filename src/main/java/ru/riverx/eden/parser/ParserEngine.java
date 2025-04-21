@@ -99,6 +99,7 @@ public class ParserEngine {
         asmCode.add("\teden_arg resd 1");
         asmCode.add("\teden_this resd 1");
         asmCode.add("\teden_that resd 1");
+        asmCode.add("\teden_temp resd 1");
         asmCode.add("\teden_r13 resd 1");
         asmCode.add("section .text");
         // Eden Alloc
