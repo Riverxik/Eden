@@ -19,7 +19,18 @@ public class OpPop implements VM2Asm {
         sb.append("\tpop eax\n");
         switch (segment) {
             case "local": {
-                sb.append("\tmov dword ebx, [eden_lcl]\n\tsub ebx, ").append((index+1)*4).append("\n\tmov dword [ebx], eax");
+                sb.append("\tmov dword ebx, [eden_lcl]\n\tsub ebx, ").append((index+1)*4)
+                        .append("\n\tmov dword [ebx], eax");
+            } break;
+            case "pointer": {
+                sb.append("\tmov dword ebx, ").append(index == 0 ? "eden_this" : "eden_that")
+                        .append("\n\tmov dword [ebx], eax");
+            } break;
+            case "this": {
+                sb.append("\tmov dword ebx, [eden_this]\n\tadd ebx, ").append(index*4).append("\n\tmov dword [ebx], eax");
+            } break;
+            case "that": {
+                sb.append("\tmov dword ebx, [eden_that]\n\tadd ebx, ").append(index*4).append("\n\tmov dword [ebx], eax");
             } break;
             default: throw new UnknownSegmentException("Unknown segment type: " + segment);
         }
