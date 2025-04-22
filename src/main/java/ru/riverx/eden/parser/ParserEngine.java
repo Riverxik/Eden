@@ -4,10 +4,7 @@ import ru.riverx.eden.exceptions.NoMainFuncException;
 import ru.riverx.eden.parser.high.SymbolKind;
 import ru.riverx.eden.parser.high.SymbolTable;
 import ru.riverx.eden.parser.high.Variable;
-import ru.riverx.eden.parser.middle.OpCall;
-import ru.riverx.eden.parser.middle.OpFunctionInfo;
-import ru.riverx.eden.parser.middle.VM2Asm;
-import ru.riverx.eden.parser.middle.VMCommand;
+import ru.riverx.eden.parser.middle.*;
 import ru.riverx.eden.tokenizer.Token;
 
 import java.util.ArrayList;
@@ -33,12 +30,14 @@ public class ParserEngine {
     private final List<String> primTypes = Arrays.asList("int", "char", "boolean");
     private final List<String> primFuncTypes = Arrays.asList("int", "char", "boolean", "void");
     private final List<Token> tokens;
+    private final List<String> externWinCallList = new ArrayList<>();
     private final String className;
     private String mainFuncName;
     private int index;
     private Token currentToken;
     private boolean wasReturn = false;
     private boolean isNeedByteShift = false;
+    private boolean isStringReadAsConstant = false;
     private int errorCount = 0;
     private final long compilationTime;
     private final SymbolTable symbolTable;
@@ -87,10 +86,14 @@ public class ParserEngine {
     }
 
     private void writeHeader(List<String> asmCode) {
-        asmCode.add("extern ExitProcess\n");
-        asmCode.add("extern GetProcessHeap\n");
-        asmCode.add("extern HeapAlloc\n");
-        asmCode.add("extern HeapFree\n");
+        asmCode.add("extern ExitProcess");
+        asmCode.add("extern GetProcessHeap");
+        asmCode.add("extern HeapAlloc");
+        asmCode.add("extern HeapFree");
+        // Custom user win-calls
+        for (String wc : externWinCallList) {
+            asmCode.add("extern " + wc);
+        }
         asmCode.add("global Start\n");
         asmCode.add("section .data");
         asmCode.add("section .bss");
@@ -118,7 +121,7 @@ public class ParserEngine {
         asmCode.add("; THINK DOWN HERE");
         asmCode.add("\tmov dword eax, [eden_arg]");
         asmCode.add("\tpush    dword [eax]");        // ; size
-        asmCode.add("\tpush    0");                  // ; flags (0 = default)
+        asmCode.add("\tpush    8");                  // ; flags (0 = default, 8 = zeroing memory)
         asmCode.add("\tcall    GetProcessHeap");
         asmCode.add("\tpush    eax");                // ; heap handle
         asmCode.add("\tcall    HeapAlloc");
@@ -535,11 +538,15 @@ public class ParserEngine {
     }
 
     private void parseString(String inputStr, int length) {
-        writer.writePush(CONSTANT, length);
-        writer.writeCall("String.new", 1);
-        for (char c : inputStr.toCharArray()) {
-            writer.writePush(CONSTANT, c);
-            writer.writeCall("String.appendChar", 2); // 0 is String base address, 1 is char
+        if (!isStringReadAsConstant) {
+            writer.writePush(CONSTANT, length);
+            writer.writeCall("String.new", 1);
+            for (char c : inputStr.toCharArray()) {
+                writer.writePush(CONSTANT, c);
+                writer.writeCall("String.appendChar", 2); // 0 is String base address, 1 is char
+            }
+        } else {
+            writer.writeRawCall(inputStr);
         }
     }
 
@@ -575,6 +582,27 @@ public class ParserEngine {
                 writer.writeCall("eden_free", nArgs);
                 break;
             }
+            case "win": {
+                expectTokenValue(WIN); acceptToken();
+                expectTokenValue("("); acceptToken();
+                List<VM2Asm> currentCode = writer.getCode();
+                isStringReadAsConstant = true;
+                int nArgs = parseExpressionList();
+                isStringReadAsConstant = false;
+                if (nArgs != 0) {
+                    List<VM2Asm> tmpList = new ArrayList<>();
+                    for (int i = currentCode.size() - 1, c = 0; c < nArgs; c++, i--) {
+                        tmpList.add(currentCode.get(i));
+                        currentCode.remove(i);
+                    }
+                    currentCode.addAll(tmpList);
+                }
+                VM2Asm lastOp = currentCode.get(currentCode.size() - 1);
+                assert lastOp instanceof OpRawCall;
+                String winCallName = ((OpRawCall)lastOp).getCallName();
+                if (!externWinCallList.contains(winCallName)) { externWinCallList.add(winCallName); }
+                expectTokenValue(")"); // Does not accept here, cause after keyword constant acceptToken will call.
+            } break;
             default:
                 printError(currentToken, "Unknown keyword");
         }

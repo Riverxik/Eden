@@ -72,4 +72,8 @@ public class VMWriter {
     public void writeReturn() {
         vmCode.add(new OpReturn());
     }
+
+    public void writeRawCall(String name) {
+        vmCode.add(new OpRawCall(name));
+    }
 }
