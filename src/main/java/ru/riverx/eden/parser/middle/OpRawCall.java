@@ -12,8 +12,4 @@ public class OpRawCall implements VM2Asm {
     public String getAsmCode() {
         return "; RawCall\n\tcall " + callName + "\n\tpush eax";
     }
-
-    public String getCallName() {
-        return callName;
-    }
 }

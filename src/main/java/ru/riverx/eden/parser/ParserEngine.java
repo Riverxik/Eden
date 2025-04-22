@@ -37,7 +37,6 @@ public class ParserEngine {
     private Token currentToken;
     private boolean wasReturn = false;
     private boolean isNeedByteShift = false;
-    private boolean isStringReadAsConstant = false;
     private int errorCount = 0;
     private final long compilationTime;
     private final SymbolTable symbolTable;
@@ -538,15 +537,11 @@ public class ParserEngine {
     }
 
     private void parseString(String inputStr, int length) {
-        if (!isStringReadAsConstant) {
-            writer.writePush(CONSTANT, length);
-            writer.writeCall("String.new", 1);
-            for (char c : inputStr.toCharArray()) {
-                writer.writePush(CONSTANT, c);
-                writer.writeCall("String.appendChar", 2); // 0 is String base address, 1 is char
-            }
-        } else {
-            writer.writeRawCall(inputStr);
+        writer.writePush(CONSTANT, length);
+        writer.writeCall("String.new", 1);
+        for (char c : inputStr.toCharArray()) {
+            writer.writePush(CONSTANT, c);
+            writer.writeCall("String.appendChar", 2); // 0 is String base address, 1 is char
         }
     }
 
@@ -585,11 +580,11 @@ public class ParserEngine {
             case "win": {
                 expectTokenValue(WIN); acceptToken();
                 expectTokenValue("("); acceptToken();
-                List<VM2Asm> currentCode = writer.getCode();
-                isStringReadAsConstant = true;
+                String winCallName = expectAndGetStringConstant();
+                if (expectTokenValue(false, ",")) { acceptToken(); }
                 int nArgs = parseExpressionList();
-                isStringReadAsConstant = false;
                 if (nArgs != 0) {
+                    List<VM2Asm> currentCode = writer.getCode();
                     List<VM2Asm> tmpList = new ArrayList<>();
                     for (int i = currentCode.size() - 1, c = 0; c < nArgs; c++, i--) {
                         tmpList.add(currentCode.get(i));
@@ -597,9 +592,7 @@ public class ParserEngine {
                     }
                     currentCode.addAll(tmpList);
                 }
-                VM2Asm lastOp = currentCode.get(currentCode.size() - 1);
-                assert lastOp instanceof OpRawCall;
-                String winCallName = ((OpRawCall)lastOp).getCallName();
+                writer.writeRawCall(winCallName);
                 if (!externWinCallList.contains(winCallName)) { externWinCallList.add(winCallName); }
                 expectTokenValue(")"); // Does not accept here, cause after keyword constant acceptToken will call.
             } break;
@@ -687,6 +680,14 @@ public class ParserEngine {
             }
             acceptToken();
         } while (expectTokenValue(false, ","));
+    }
+
+    private String expectAndGetStringConstant() {
+        Token.TokenType type = currentToken.getType();
+        assert type == Token.TokenType.STRING_CONSTANT;
+        String strConstWinCallName = currentToken.getValue();
+        acceptToken();
+        return strConstWinCallName;
     }
 
     private void expectTypeValue(boolean isFunc) {
