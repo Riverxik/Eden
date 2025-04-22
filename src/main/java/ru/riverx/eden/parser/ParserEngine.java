@@ -6,7 +6,13 @@ import ru.riverx.eden.parser.high.SymbolTable;
 import ru.riverx.eden.parser.high.Variable;
 import ru.riverx.eden.parser.middle.*;
 import ru.riverx.eden.tokenizer.Token;
+import ru.riverx.eden.tokenizer.Tokenizer;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,7 +37,8 @@ public class ParserEngine {
     private final List<String> primFuncTypes = Arrays.asList("int", "char", "boolean", "void");
     private final List<Token> tokens;
     private final List<String> externWinCallList = new ArrayList<>();
-    private final String className;
+    private final List<String> usedClasses = new ArrayList<>();
+    private String className;
     private String mainFuncName;
     private int index;
     private Token currentToken;
@@ -51,7 +58,7 @@ public class ParserEngine {
         this.symbolTable = new SymbolTable();
         this.writer = new VMWriter();
         long start = System.currentTimeMillis();
-        parseClass();
+        parseProgram();
         this.compilationTime = System.currentTimeMillis() - start;
         validateMain();
         printTranslateInfo();
@@ -196,6 +203,52 @@ public class ParserEngine {
         } else {
             System.out.printf("[%s] Translation done in %d ms%n", className, compilationTime);
         }
+    }
+
+    private void parseProgram() {
+        parseLibs();
+        parseClass();
+    }
+
+    private void parseLibs() {
+        if (!expectTokenValue(false, "use")) {
+            return;
+        }
+        expectTokenValue("use"); acceptToken();
+        String libNameWithPath = expectAndGetStringConstant();
+        if (libNameWithPath.isEmpty()) {
+            printError(currentToken, "Filename for include is empty: " + libNameWithPath);
+            return;
+        }
+
+        if (usedClasses.contains(libNameWithPath)) {
+            printError(currentToken, "Class already included: " + libNameWithPath);
+        } else {
+            usedClasses.add(libNameWithPath);
+        }
+
+        Path sourcePath = Paths.get(libNameWithPath);
+        if (!Files.exists(sourcePath)) {
+            printError(currentToken, "File does not exists: " + sourcePath);
+            return;
+        }
+
+        try {
+            String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+            Tokenizer tokenizer = new Tokenizer(libNameWithPath, source);
+            List<Token> libTokens = tokenizer.getTokenList();
+            tokens.addAll(libTokens);
+        } catch (IOException e) {
+            printError(currentToken, "Unable to import file: " + sourcePath + ", cause: " + e.getMessage());
+            return;
+        }
+
+        expectTokenValue(";"); acceptToken();
+        parseProgram(); acceptToken(); // Accept '}' from end of the class below
+        // Change className to correctly parse lib tokens
+        String libClassName = sourcePath.getFileName().toString();
+        int dotIndex = libClassName.indexOf(".");
+        className = dotIndex == -1 ? libClassName : libClassName.substring(0, dotIndex);
     }
 
     private void parseClass() {
