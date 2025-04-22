@@ -398,7 +398,7 @@ public class ParserEngine {
     private void writeSubroutineDeclaration(int subIndex, String subName) {
         writer.writeFunction(className + "." + subName, symbolTable.varCount(SymbolKind.VAR));
         if (subIndex == 0) { // constructor
-            writer.writePush(CONSTANT, symbolTable.varCount(SymbolKind.FIELD));
+            writer.writePush(CONSTANT, symbolTable.varCount(SymbolKind.FIELD) * 4);
             writer.writeCall("eden_alloc", 1);
             writer.writePop(POINTER, 0);
         } else if (subIndex == 2) { // method
