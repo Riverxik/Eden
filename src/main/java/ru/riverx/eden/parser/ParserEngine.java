@@ -61,7 +61,6 @@ public class ParserEngine {
         parseProgram();
         this.compilationTime = System.currentTimeMillis() - start;
         validateMain();
-        printTranslateInfo();
     }
 
     private void parseProgram() {
@@ -276,6 +275,7 @@ public class ParserEngine {
         parseSubroutineDec();
         expectTokenValue("}");
         symbolTable.resetKindCountClass();
+        printTranslateInfo();
     }
 
     private void validateClassName() {
