@@ -52,7 +52,7 @@ public class ParserEngine {
 
     public ParserEngine(List<Token> tokens, String filename) {
         this.tokens = tokens;
-        this.className = calculateClassName(filename);
+        this.className = filename;
         this.index = 0;
         this.currentToken = tokens.get(index);
         this.symbolTable = new SymbolTable();
@@ -62,6 +62,14 @@ public class ParserEngine {
         this.compilationTime = System.currentTimeMillis() - start;
         validateMain();
         printTranslateInfo();
+    }
+
+    private void parseProgram() {
+        parseClass();
+        if (index < tokens.size() - 1) {
+            acceptToken(); // '}' from end of the class
+            parseProgram();
+        }
     }
 
     private void validateMain() {
@@ -189,13 +197,6 @@ public class ParserEngine {
         asmCode.add("\tcall ExitProcess");
     }
 
-    private String calculateClassName(String filename) {
-        if (filename.contains("/")) {
-            filename = filename.split("/")[1];
-        }
-        return filename.split("[.]")[0];
-    }
-
     private void printTranslateInfo() {
         if (errorCount > 0) {
             System.err.printf("[%s] Translating failed with %d errors!%n", className, errorCount);
@@ -203,11 +204,6 @@ public class ParserEngine {
         } else {
             System.out.printf("[%s] Translation done in %d ms%n", className, compilationTime);
         }
-    }
-
-    private void parseProgram() {
-        parseLibs();
-        parseClass();
     }
 
     private void parseLibs() {
@@ -225,33 +221,52 @@ public class ParserEngine {
             printError(currentToken, "Class already included: " + libNameWithPath);
         } else {
             usedClasses.add(libNameWithPath);
-        }
 
-        Path sourcePath = Paths.get(libNameWithPath);
-        if (!Files.exists(sourcePath)) {
-            printError(currentToken, "File does not exists: " + sourcePath);
-            return;
-        }
+            Path sourcePath = Paths.get(libNameWithPath);
+            if (!Files.exists(sourcePath)) {
+                printError(currentToken, "File does not exists: " + sourcePath);
+                return;
+            }
 
-        try {
-            String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
-            Tokenizer tokenizer = new Tokenizer(libNameWithPath, source);
-            List<Token> libTokens = tokenizer.getTokenList();
-            tokens.addAll(libTokens);
-        } catch (IOException e) {
-            printError(currentToken, "Unable to import file: " + sourcePath + ", cause: " + e.getMessage());
-            return;
+            try {
+                String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+                Tokenizer tokenizer = new Tokenizer(libNameWithPath, source);
+                List<Token> libTokens = tokenizer.getTokenList();
+                tokens.addAll(libTokens);
+            } catch (IOException e) {
+                printError(currentToken, "Unable to import file: " + sourcePath + ", cause: " + e.getMessage());
+                return;
+            }
         }
-
         expectTokenValue(";"); acceptToken();
-        parseProgram(); acceptToken(); // Accept '}' from end of the class below
-        // Change className to correctly parse lib tokens
-        String libClassName = sourcePath.getFileName().toString();
-        int dotIndex = libClassName.indexOf(".");
-        className = dotIndex == -1 ? libClassName : libClassName.substring(0, dotIndex);
+
+        parseLibs();
+    }
+
+    private String extractNameFromPath(String path) {
+        int end = 0;
+        int start = 0;
+        int i = path.length() - 1;
+        for (; i > 0; i--) {
+            char c = path.charAt(i);
+            if (c == '.') {
+                end = i;
+                break;
+            }
+        }
+        for (; i > 0; i--) {
+            char c = path.charAt(i);
+            if (c == '/' || c == '\\') {
+                start = i;
+                break;
+            }
+        }
+        return path.substring(start + 1, end);
     }
 
     private void parseClass() {
+        parseLibs();
+        className = extractNameFromPath(currentToken.getFilename());
         expectTokenValue("class"); acceptToken();
         expectTokenValue(className);
         validateClassName();
