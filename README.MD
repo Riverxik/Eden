@@ -69,7 +69,7 @@ I use 32 bit for now, for no reason, just because I can. Maybe I will change it 
 
 #### Keywords:
 * Program components (use, class, constructor, method, func)
-* Primitive types (int, boolean, char, void)
+* Primitive types (int, bool, char, void)
 * Variable declarations (var, static, field)
 * Statements (let, do, if, else, while, return)
 * Constant values (true, false, null)

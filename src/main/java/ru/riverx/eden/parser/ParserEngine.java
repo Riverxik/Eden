@@ -33,8 +33,8 @@ public class ParserEngine {
     public static final String TEMP = "temp";
     public static final String THAT = "that";
 
-    private final List<String> primTypes = Arrays.asList("int", "char", "boolean");
-    private final List<String> primFuncTypes = Arrays.asList("int", "char", "boolean", "void");
+    private final List<String> primTypes = Arrays.asList("int", "char", "bool");
+    private final List<String> primFuncTypes = Arrays.asList("int", "char", "bool", "void");
     private final List<Token> tokens;
     private final List<String> externWinCallList = new ArrayList<>();
     private final List<String> usedClasses = new ArrayList<>();
@@ -295,7 +295,7 @@ public class ParserEngine {
     private void parseClassVarDec() {
         while (expectTokenValue(false,"static", "field")) {
             String kind = parseKind(); // static | field
-            String type = parseType(); // int | char | boolean | className
+            String type = parseType(); // int | char | bool | className
             parseIdentifiers(kind, type);
             expectTokenValue(";"); acceptToken();
         }
