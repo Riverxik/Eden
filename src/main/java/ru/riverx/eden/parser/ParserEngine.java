@@ -131,7 +131,7 @@ public class ParserEngine {
         asmCode.add("\tmov dword [eden_arg], ebx");
         asmCode.add("\tsub dword [eden_arg], 4");
         asmCode.add("\tmov dword [eden_lcl], esp");
-        asmCode.add("; THINK DOWN HERE");
+        asmCode.add("; LOGIC HERE");
         asmCode.add("\tmov dword eax, [eden_arg]");
         asmCode.add("\tpush    dword [eax]");        // ; size
         asmCode.add("\tpush    8");                  // ; flags (0 = default, 8 = zeroing memory)
@@ -159,6 +159,40 @@ public class ParserEngine {
         asmCode.add("\tpush    eax");                // ; heap handle
         asmCode.add("\tcall    HeapFree");
         asmCode.add("\tjmp eden_return");
+        // Eden inner Comparison EQ
+        asmCode.add("eden_comp_eq:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tje eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Eden inner Comparison LT
+        asmCode.add("eden_comp_lt:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tjl eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Eden inner Comparison GT
+        asmCode.add("eden_comp_gt:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tjg eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Comparison failure
+        asmCode.add("eden_comp_failure:");
+        asmCode.add("\tpush 0");
+        asmCode.add("\tjmp eden_comp_end");
+        // Comparison success
+        asmCode.add("eden_comp_success:");
+        asmCode.add("\tpush -1");
+        asmCode.add("eden_comp_end:");
+        // Jump back from comparison
+        asmCode.add("\tjmp [eden_r13]");
         // call return label
         asmCode.add("eden_return:");
         // put return value that is on eax in [arg]
@@ -681,9 +715,9 @@ public class ParserEngine {
             } break;
             case '*': writer.writeArithmetic(VMCommand.MULTIPLY); break;
             case '/': writer.writeArithmetic(VMCommand.DIVIDE); break;
-            case '=': writer.writeArithmetic(VMCommand.EQ); break;
-            case '<': writer.writeArithmetic(VMCommand.LT); break;
-            case '>': writer.writeArithmetic(VMCommand.GT); break;
+            case '=': writer.writeArithmetic(VMCommand.EQ, className+"_RT_" + getUniqueNumber()); break;
+            case '<': writer.writeArithmetic(VMCommand.LT, className+"_RT_" + getUniqueNumber()); break;
+            case '>': writer.writeArithmetic(VMCommand.GT, className+"_RT_" + getUniqueNumber()); break;
             case '&': writer.writeArithmetic(VMCommand.AND); break;
             case '|': writer.writeArithmetic(VMCommand.OR); break;
             case '~': writer.writeArithmetic(VMCommand.NOT); break;
