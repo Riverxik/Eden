@@ -26,7 +26,7 @@ public class VMWriter {
     }
 
     public void writeArithmetic(VMCommand cmd) {
-        writeArithmetic(cmd, "");
+        writeArithmetic(cmd, null);
     }
 
     public void writeArithmetic(VMCommand cmd, String uniqueLabel) {
