@@ -1,0 +1,5 @@
+use "tests\\IncludeA";
+
+class IncludeB {
+    // Second class for testing nesting include cycles.
+}

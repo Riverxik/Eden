@@ -1,4 +1,4 @@
-package ru.riverx.eden;
+package ru.riverx.eden.old_implementation;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
@@ -12,7 +12,7 @@ import java.util.*;
 /**
  * I will try to make Eden self-hosted as soon as possible, so forgive me for this mess
  * I will try it without OOP style. After I self-hosted it I will refactor all of this. Maybe, maybe not.
- * I just started and i see that it's really hard to do without OOP features and stuff...
+ * I just started and I see that it's really hard to do without OOP features and stuff...
  */
 public class Eden {
 //    private static final long MAX_C_INTEGER = Integer.MAX_VALUE;
@@ -29,6 +29,7 @@ public class Eden {
     static List<SymbolTableElem> symbolTable = new ArrayList<>();
     static int localVarShift = 0;
     static List<SymbolTableElem> usedVariables = new ArrayList<>();
+    static List<String> usedClasses = new ArrayList<>();
     static List<String> subroutineNames = new ArrayList<>();
     static String mainFuncName;
     static int uniqueIndex = 0;
@@ -80,6 +81,7 @@ public class Eden {
         Lexer lexer = new Lexer(source, tokenList);
         lexer.tokenize();
         lexer.clearComments();
+        usedClasses.add(sourceName);
 
         //tokenList.forEach(System.out::println);
 
@@ -97,10 +99,21 @@ public class Eden {
                 System.out.println(run(sourceName.replaceAll("[/]","\\\\").split("[.]")[0]+".exe"));
             }
         } else {
-            while (irPointer >= 0) {
-                intermediateRepresentation.get(irPointer).interpret();
+            // Temporary disable interpretation.
+//            irPointer = getIrPointerMainFunc();
+//            while (irPointer >= 0) {
+//                intermediateRepresentation.get(irPointer).interpret();
+//            }
+        }
+    }
+
+    private static int getIrPointerMainFunc() {
+        for (Op op : intermediateRepresentation) {
+            if (op instanceof OpFunc && ((OpFunc)op).getName().equals(mainFuncName)) {
+                return intermediateRepresentation.indexOf(op);
             }
         }
+        return 0;
     }
 
     private static String run(String execCmd) throws IOException, InterruptedException {
@@ -160,7 +173,12 @@ public class Eden {
         fw.write("extern GetStdHandle\n" +
                      "extern WriteFile\n" +
                      "extern ExitProcess\n" +
+                     "extern HeapAlloc\n" +
+                     "extern HeapFree\n" +
+                     "extern GetProcessHeap\n" +
                      "\n" +
+                     "global eden_alloc\n" +
+                     "global eden_free\n" +
                      "global Start\n");
     }
 
@@ -201,6 +219,24 @@ public class Eden {
 
     static void writeText(FileWriter fw) throws IOException {
         fw.write("section .text\n");
+        // Eden Alloc
+        fw.write(";Expects a number on the stack - how much bytes allocate\n");
+        fw.write("eden_alloc:\n");
+        fw.write("\tpush    dword [esp+4]\n");      // ; size
+        fw.write("\tpush    0\n");                  // ; flags (0 = default)
+        fw.write("\tcall    GetProcessHeap\n");
+        fw.write("\tpush    eax\n");                // ; heap handle
+        fw.write("\tcall    HeapAlloc\n");
+        fw.write("\tret\n");
+        // Eden Free
+        fw.write(";Expects a pointer on the stack - to de-allocate memory\n");
+        fw.write("eden_free:\n");
+        fw.write("\tpush    dword [esp+4]\n");      //   ; ptr
+        fw.write("\tpush    0\n");                  //   ; flags
+        fw.write("\tcall    GetProcessHeap\n");
+        fw.write("\tpush    eax\n");                // ; heap handle
+        fw.write("\tcall    HeapFree\n");
+        fw.write("\tret\n");
         // RetFromLogic
         fw.write("retFrom:\n");
         fw.write("\tret\n");
@@ -366,14 +402,62 @@ public class Eden {
 //    }
 
     static void parse() {
-        parseClass();
+        parseProgram();
         checkForMainFunc();
+    }
+
+    static void parseProgram() {
+        parseLibs();
+        parseClass();
+    }
+
+    static void parseLibs() {
+        if (!hasNextTokenValues("use")) {
+            return;
+        }
+        expectKeyword("use");
+
+        Token t = tokenList.get(tokenIndex);
+        if (!t.type.equals(TokenType.STRING)) {
+            printErrToken(t, "Filename for include must be string");
+        }
+        tokenIndex++;
+        expectTokenType(TokenType.SEMICOLON);
+        String sourceName = String.valueOf(t.value);
+        if (usedClasses.contains(sourceName)) {
+            printErrToken(t, "Class already included: " + sourceName);
+        } else {
+            usedClasses.add(sourceName);
+        }
+
+        if (sourceName.isEmpty()) {
+            printErrToken(t, "Filename for include is empty");
+            return;
+        }
+        Path sourcePath = Paths.get(sourceName + ".eden");
+        if (!Files.exists(sourcePath)) {
+            System.out.println("File does not exists: " + sourceName);
+            System.exit(1);
+        }
+        try {
+            String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+            // Lexing.
+            List<Token> customTokenList = new ArrayList<>();
+            Lexer lexer = new Lexer(source, customTokenList);
+            lexer.tokenize();
+            lexer.clearComments();
+            customTokenList.remove((customTokenList).size() - 1); // Remove EOF
+            tokenList.addAll(tokenIndex, customTokenList);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        parseProgram();
     }
 
     static void checkForMainFunc() {
         boolean isMain = false;
         for (String name : subroutineNames) {
-            if (name.split("[.]")[1].equals("Eden_main")) {
+            if (name.equals(currentClassName + ".Eden_main")) {
                 isMain = true;
                 mainFuncName = name;
                 break;
@@ -686,6 +770,12 @@ public class Eden {
         return localVarCount;
     }
 
+    static void expectAllocStatement() {
+        expectKeywords("alloc");
+        expectExpression();
+        intermediateRepresentation.add(new OpEdenAlloc());
+    }
+
     static void expectReturnStatement() {
         expectExpression();
         intermediateRepresentation.add(new OpReturn());
@@ -725,7 +815,11 @@ public class Eden {
         OpAssign opAssign = new OpAssign(varName, var.kind, var.shift);
         tokenIndex++; // =
         intermediateRepresentation.add(opPushVar);
-        expectExpression();
+        if (hasNextTokenValues("alloc")) {
+            expectAllocStatement();
+        } else {
+            expectExpression();
+        }
         intermediateRepresentation.add(opAssign);
     }
 
@@ -1251,6 +1345,23 @@ public class Eden {
         public void generate() {
             programCode.append("\n;OpWinCall: ").append(callName).append(":").append(nArgs);
             programCode.append("\n\tCALL ").append(callName);
+            programCode.append("\n\tPUSH EAX");
+        }
+    }
+
+    static class OpEdenAlloc implements Op {
+
+        @Override
+        public void interpret() {
+            throw new NotImplementedException();
+        }
+
+        @Override
+        public void generate() {
+            programCode.append("\n;OpEdenAlloc:");
+            programCode.append("\n\tCALL eden_alloc");
+            programCode.append("\n\tADD ESP, 4");
+            programCode.append("\n\tMOV EBX, EAX");
             programCode.append("\n\tPUSH EAX");
         }
     }
@@ -2226,6 +2337,7 @@ public class Eden {
             keywordList.add("true");
             keywordList.add("false");
             keywordList.add("win");
+            keywordList.add("alloc");
         }
 
         void clearComments() {
