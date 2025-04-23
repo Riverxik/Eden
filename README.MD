@@ -1,5 +1,8 @@
 # Eden Programming Language
 
+> [!WARNING]
+> Compiler is not fully implemented yet.
+
 **WARNING! Eden language is still in development stage.**
 
 Eden is object-oriented programming language written in Java. 
@@ -17,40 +20,31 @@ The stuff required for be self-hosted (In my opinion):
 - [ ] Support executing external programs
 - [x] Class declarations
 - [x] Function declarations
-- [ ] Method declarations
-- [ ] Constructors
+- [x] Method declarations
+- [x] Constructors
+- [x] Memory management (alloc, free)
 - [x] Variable declarations
 - [x] Type: Integer
 - [x] Type: Boolean
-- [ ] Type: Char
-- [x] Type: String (Only constants for now)
+- [x] Type: Char
+- [x] Notion of Array
 - [ ] List structure
 - [ ] Stack structure
-- [x] Conditional statements (if-else)
-- [x] Loop statement (while)
+- [ ] Conditional statements (if-else)
+- [ ] Loop statement (while)
 ---
 
 ## Quick start
 You have to have installed [nasm](https://www.nasm.us/) and [golink](https://www.godevtool.com/) on your machine.
 
-Compiler use interpreter mode by default for now. To specify source file use `-s` flag:
+You can compile your program to native executable:
 ```shell
-$ java -jar Eden.jar -s hello.eden
+$ java -jar Eden.jar -s Hello.eden
 ```
 
-Also, you can compile your program to native executable. Use `-c` to compile.
-```shell
-$ java -jar Eden.jar -c -s hello.eden
-```
-
-You can use `-r` to execute automatically after successful compilation (temporary disabled).
-```shell
-$ java -jar Eden.jar -c -r -s hello.eden
-```
-
-### How exactly compilation works:
+### How exactly compilation works?
 Compilation process made though [nasm](https://www.nasm.us/) and [golink](https://www.godevtool.com/) in three steps:
-1. Lexing, parsing `.eden` and making `.asm` file
+1. Lexing, parsing `.eden` and translating to `.asm` file
 2. Compile `.asm` file to `.obj`
 3. Linking `.obj` file to native executable `.exe`
 ```shell
@@ -62,95 +56,180 @@ Test: PE32 executable (console) Intel 80386, for MS Windows
 
 I use 32 bit for now, for no reason, just because I can. Maybe I will change it to 64 bit later. Will see.
 
-## Class declaration
+## Language specification
 
-Example of simple class declaration for Hello world program.
+### Syntax elements
+
+#### White space / comments:
+```
+// Comment to end of line
+/* Comment until closing */
+/** API documentation comment */
+```
+
+#### Keywords:
+* Program components (use, class, constructor, method, func)
+* Primitive types (int, bool, char, void)
+* Variable declarations (var, static, field)
+* Statements (let, do, if, else, while, return)
+* Constant values (true, false, null)
+* Object reference (this)
+
+#### Symbols:
+* `()` - used for grouping arithmetic expressions and for enclosing parameter-lists and argument-lists
+* `[]` - used for array indexing
+* `{}` - used for grouping program units and statements
+* `,` - variable list separator
+* `;` - statement terminator
+* `=` - assignment and comparison operator
+* `.` - class membership
+* `+`, `-`, `*`, `/`, `&`, `|`, `~`, `<`, `>` - operators
+
+#### Constants:
+* Integer constants must be positive and in standard decimal notation, e.g. 1954
+* String constants are enclosed within two quote `"` characters and may contain any character except `newline` or `"`
+* Boolean constants can be `true` or `false`
+* The `null` constant signifies a null reference
+
+#### Identifiers:
+* Identifiers are composed of arbitrarily long sequences of letters `(A-Z,a-z)`, digits `(0-9)` and `_`
+* The first character must be a letter or `_`
+* Eden language is case-sensitive
+
+### Classes
+
+---
+
+* Class is basic compilation unit
+* Each class `Foo` is stored in a separate `Foo.eden` file
+* The class name's first character must be an uppercase letter
+
+General class structure
 ```shell
-class Hello {
-  func void main() {
-    ~ "Hello, Eden!\n";
-  }
+/** Foo.eden file */
+use import declarations
+class Foo {
+  field variable declarations
+  static variable declarations
+  subroutine declarations
 }
 ```
 
-## Statements
+### Subroutines
 
-#### Print statement (~)
-
-Prints some expression on the screen.
-
-Syntax:
-```
-~ expr ;
-```
-
-Examples:
-```
-~ 2 + 2 * 2;
-~ 1 + 2;
-~ -1;
-```
 ---
 
-#### If-else statements
-Conditional statements are used to perform different actions based on different conditions.
-
-Syntax:
-```
-if <expr> { 
-    // statements when expression returns 1; 
-} else {
-    // statements when expression returns 0;
+```shell
+constructor | method | func type subroutineName (parameter-list) {
+  local variable declarations
+  statements
 }
 ```
+* Method and function type can be either `void`, a primitive data type, or a class name
+* Each subroutine must return a value (implicitly for now)
 
-Examples:
-```
-// Prints 456
-bool a = false;
-if (a) {
-    ~ 123;
-} else {
-    ~ 456;
-}
+#### Constructors:
+* 0, 1, or more in a class
+* A common name: `new`
+* The constructor's type must be the name of the constructor's class
+* The constructor must return a reference to an object of the class type
 
-// Not equal to (like != in java)
-int a = expr;
-if (expr = 0) {
-    // statements
-    ...
-}
-```
+
+### Variables
+
 ---
+
+* static variables - class level variables
+* field variables - object properties
+* local variables - used by subroutines, for local computations
+* parameter variables - used to pass values to subroutines
+
+### Statements
+
+---
+
+* let - `let varName = expression;` or `let varName[expr1] = expr2;`
+* if - `if (expr) { statementsTrue } else { statementsFalse }`
+* while - `while (exprTrue) { statements }`
+* do - `do functionOrMethodCall();`
+* return - `return expr;` or `return;`
+
+### Expressions
+
+---
+
+* `integer number`
+* `variable`
+* `<exp> <op> <exp>`
+* `<op> <exp>`
+* `win-call`
 
 ### WindowsAPI Calls (win-call)
+
+---
 
 Performs a Windows api call
 
 Syntax:
 ```
-result = win:"NameOfWinCall", params...;
+result = win("NameOfWinCall", params...);
 ```
 
 Examples:
 
 Get a console handler and print `Hello world!` through `WriteFile` win-call (kernel32.dll). [More info](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-writefile)
-```
-func void writeToConsole() {
-    int stdOutHandle;       // Std out handler
-    int writtenBuff;        // Buffer for writing to
-    int sizeToWrite = 13;   // How many bytes write to handler
-    int resultCode;         // Returned code for operation
-    int stdOutCode = -11;
-    stdOutHandle = win:"GetStdHandle", stdOutCode;
-    resultCode = win:"WriteFile", stdOutHandle, "Hello world\n", 13, writtenBuff, 0;
-    if resultCode = 0 {
-        ~ "Error with code: "; ~ resultCode; ~ "\n";
-    }
+
+It's a little bit ugly for now, but it works, so who cares :> 
+```eden
+func void printHelloWorld() {
+    var Array data;
+    var int stdOutCode, stdOutHandle, writtenBuff, sizeToWrite, resultCode;
+    let data = alloc(52); // 4 * 13
+    let data[0] = 72;   // 'H'
+    let data[1] = 101;  // 'e'
+    let data[2] = 108;  // 'l'
+    let data[3] = 108;  // 'l'
+    let data[4] = 111;  // 'o'
+    let data[5] = 32;   // ' '
+    let data[6] = 87;   // 'W'
+    let data[7] = 111;  // 'o'
+    let data[8] = 114;  // 'r'
+    let data[9] = 108;  // 'l'
+    let data[10] = 100; // 'd'
+    let data[11] = 33;  // '!'
+    let data[12] = 10;  // '\n'
+    let writtenBuff = alloc(1);
+    let sizeToWrite = 52;
+    let stdOutCode = -11;
+    let stdOutHandle = win("GetStdHandle", stdOutCode);
+    let resultCode = win("WriteFile", stdOutHandle, data, sizeToWrite, writtenBuff, 0);
+    return;
 }
 ```
 
+### Importing external sources
+
+---
+
+You can import already written Eden class to your program.
+
+Syntax:
+```
+use "pathToEdenfile";
+```
+
+Examples:
+```shell
+use "std\\Math.eden";
+use "Point.eden";
+use "/home/eden/std/Math.eden";
+
+class YourClass { ... }
+```
+
 ### Variable definition and assignment
+
+---
 
 Defines a variable with different types and assign value to it.
 
