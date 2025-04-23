@@ -37,8 +37,8 @@ public class VMWriter {
             case EQ: vmCode.add(new OpEq(uniqueLabel)); break;
             case GT: vmCode.add(new OpGt(uniqueLabel)); break;
             case LT: vmCode.add(new OpLt(uniqueLabel)); break;
-//            case AND: vmCode.add("and"); break;
-//            case OR: vmCode.add("or"); break;
+            case AND: vmCode.add(new OpAnd()); break;
+            case OR: vmCode.add(new OpOr()); break;
             case NOT: vmCode.add(new OpNot()); break;
             case MULTIPLY: vmCode.add(new OpMul()); break;
             case DIVIDE: vmCode.add(new OpDivide()); break;
