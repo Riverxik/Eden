@@ -11,7 +11,7 @@ Just because it's fun, and I can (can I?).
 
 Eden is planned to be:
 - [x] Compiled
-- [ ] Turing-complete
+- [x] Turing-complete
 - [ ] Self-hosted (Java is used only as an initial bootstrap, once the language is mature enough I'm going to rewrite it in itself)
 
 The stuff required for be self-hosted (In my opinion):
@@ -30,8 +30,8 @@ The stuff required for be self-hosted (In my opinion):
 - [x] Notion of Array
 - [ ] List structure
 - [ ] Stack structure
-- [ ] Conditional statements (if-else)
-- [ ] Loop statement (while)
+- [x] Conditional statements (if-else)
+- [x] Loop statement (while)
 ---
 
 ## Quick start
