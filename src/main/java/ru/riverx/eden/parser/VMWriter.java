@@ -40,8 +40,8 @@ public class VMWriter {
 //            case AND: vmCode.add("and"); break;
 //            case OR: vmCode.add("or"); break;
             case NOT: vmCode.add(new OpNot()); break;
-//            case MULTIPLY: writeCall("Math.multiply", 2); break;
-//            case DIVIDE: writeCall("Math.divide", 2); break;
+            case MULTIPLY: vmCode.add(new OpMul()); break;
+            case DIVIDE: vmCode.add(new OpDivide()); break;
             default: throw new IllegalArgumentException("Not implemented cmd: " + cmd);
         }
     }
