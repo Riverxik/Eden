@@ -11,5 +11,7 @@ public enum VMCommand {
     OR,
     NOT,
     MULTIPLY,
-    DIVIDE
+    DIVIDE,
+    L_SHIFT,
+    R_SHIFT
 }

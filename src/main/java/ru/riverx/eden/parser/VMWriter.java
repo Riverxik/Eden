@@ -42,6 +42,8 @@ public class VMWriter {
             case NOT: vmCode.add(new OpNot()); break;
             case MULTIPLY: vmCode.add(new OpMul()); break;
             case DIVIDE: vmCode.add(new OpDivide()); break;
+            case L_SHIFT: vmCode.add(new OpLeftShift()); break;
+            case R_SHIFT: vmCode.add(new OpRightShift()); break;
             default: throw new IllegalArgumentException("Not implemented cmd: " + cmd);
         }
     }

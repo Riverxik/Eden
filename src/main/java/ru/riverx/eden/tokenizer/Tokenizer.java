@@ -146,7 +146,29 @@ public class Tokenizer {
             System.exit(-1);
         }
 
-        return new Token(String.valueOf(curr), Token.TokenType.SYMBOL, filename, line);
+        switch (curr) {
+            case '>': {
+                int cIdx = charCount;
+                char next = getNextChar();
+                if (next == curr) {
+                    return new Token(">>", Token.TokenType.SYMBOL, filename, line);
+                } else {
+                    charCount = cIdx;
+                    return new Token(String.valueOf(curr), Token.TokenType.SYMBOL, filename, line);
+                }
+            }
+            case '<': {
+                int cIdx = charCount;
+                char next = getNextChar();
+                if (next == curr) {
+                    return new Token("<<", Token.TokenType.SYMBOL, filename, line);
+                } else {
+                    charCount = cIdx;
+                    return new Token(String.valueOf(curr), Token.TokenType.SYMBOL, filename, line);
+                }
+            }
+            default: return new Token(String.valueOf(curr), Token.TokenType.SYMBOL, filename, line);
+        }
     }
 
     private boolean hasNextChar() { return charCount < length; }

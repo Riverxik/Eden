@@ -550,12 +550,128 @@ public class ParserEngine {
     }
 
     private void parseExpression() {
+//        parseTerm();
+//        if (expectTokenValue(false, "+", "-", "*", "/", "&", "|", "<", ">", "=")) {
+//            expectTokenValue("+", "-", "*", "/", "&", "|", "<", ">", "=");
+//            char op = currentToken.getValue().charAt(0); acceptToken();
+//            parseExpression();
+//            writeOp(op, false);
+//        }
+        part();
+        sum();
+        shift();
+        logical();
+        bitwise();
+    }
+
+    private void part() {
+        unary();
+    }
+
+    private void unary() {
+        Token t = tokens.get(index);
+        if (expectTokenValue(false, "+", "-")) {
+            acceptToken();
+        }
         parseTerm();
-        if (expectTokenValue(false, "+", "-", "*", "/", "&", "|", "<", ">", "=")) {
-            expectTokenValue("+", "-", "*", "/", "&", "|", "<", ">", "=");
-            char op = currentToken.getValue().charAt(0); acceptToken();
-            parseExpression();
-            writeOp(op, false);
+        if (t.getValue().equals("-")) {
+            writeOp('-', true);
+        }
+        starSlash();
+    }
+
+    private void starSlash() {
+        if (expectTokenValue(false, "*")) {
+            acceptToken();
+            unary();
+            writeOp('*', false);
+            starSlash();
+        }
+        if (expectTokenValue(false, "/")) {
+            acceptToken();
+            unary();
+            writeOp('/', false);
+            starSlash();
+        }
+    }
+
+    private void sum() {
+        if (expectTokenValue(false, "+")) {
+            acceptToken();
+            part();
+            writeOp('+', false);
+            sum();
+        }
+        if (expectTokenValue(false, "-")) {
+            acceptToken();
+            part();
+            writeOp('-', false);
+            sum();
+        }
+    }
+
+    private void shift() {
+        if (expectTokenValue(false, "<<")) {
+            acceptToken();
+            part();
+            sum();
+            writer.writeArithmetic(VMCommand.L_SHIFT);
+        }
+        if (expectTokenValue(false, ">>")) {
+            acceptToken();
+            part();
+            sum();
+            writer.writeArithmetic(VMCommand.R_SHIFT);
+        }
+    }
+
+    private void bitwise() {
+        if (expectTokenValue(false, "&")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            logical();
+            writeOp('&', false);
+        }
+        if (expectTokenValue(false, "|")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            logical();
+            writeOp('|', false);
+        }
+    }
+
+    private void logical() {
+        if (expectTokenValue(false, ">")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('>', false);
+        }
+        if (expectTokenValue(false, "<")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('<', false);
+        }
+        if (expectTokenValue(false, "=")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('=', false);
+        }
+        if (expectTokenValue(false, "~")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('~', false);
         }
     }
 
