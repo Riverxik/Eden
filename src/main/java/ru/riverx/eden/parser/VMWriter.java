@@ -28,7 +28,7 @@ public class VMWriter {
     public void writeArithmetic(VMCommand cmd) {
         switch (cmd) {
             case ADD: vmCode.add(new OpAdd()); break;
-//            case SUB: vmCode.add("sub"); break;
+            case SUB: vmCode.add(new OpSub()); break;
             case NEG: vmCode.add(new OpNeg()); break;
 //            case EQ: vmCode.add("eq"); break;
 //            case GT: vmCode.add("gt"); break;
