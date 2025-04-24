@@ -1,0 +1,55 @@
+use "std\\Win.eden";
+
+class Rule110 {
+
+    func void main() {
+        var char board, aster;
+        var int boardInt, asterInt, boardCap, i, j, bj1, next, tmp;
+        var int b0, b1, pattern;
+
+        let boardCap = 80;
+        let board = alloc(boardCap);
+        let boardInt = alloc(boardCap * 4);
+        let aster = alloc(3); // chars [ *\n]
+        let asterInt = alloc(2*4);
+        let aster[0] = 46;
+        let aster[1] = 42;
+        let aster[2] = 10;
+        let asterInt[0] = 46;
+        let asterInt[1] = 42;
+
+        let i = 0;
+        while (i < boardCap) {
+            let boardInt[i] = 46;
+            let i = i + 1;
+        }
+        let boardInt[boardCap - 2] = 42;
+
+        let i = 0;
+        while (i < boardCap - 2) {
+            let j = 0;
+            while (j < boardCap) {
+                let board[j] = boardInt[j];
+                let j = j + 1;
+            }
+            let tmp = Win.printData(board, boardCap);   // Print the board
+            let tmp = Win.printData(aster + 2, 1);      // New line
+            let i = i + 1;
+
+            let b0 = -(boardInt[0] = 42);
+            let b1 = -(boardInt[1] = 42);
+            let pattern = (b0 << 1) | b1;
+
+            let j = 1;
+            while (j < boardCap - 1) {
+                let bj1 = -(boardInt[j + 1] = 42);
+                let pattern = ((pattern << 1) & 7) | bj1;
+                let next = (110 >> pattern) & 1;
+                let boardInt[j] = asterInt[next];
+                let j = j + 1;
+            }
+        }
+
+        return;
+    }
+}
