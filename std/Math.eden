@@ -1,0 +1,8 @@
+class Math {
+
+    func int getReminder(int x, int y) {
+        var int multi;
+        let multi = x / y;
+        return x - (y * multi);
+    }
+}

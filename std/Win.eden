@@ -1,0 +1,62 @@
+use "std\\Math.eden";
+
+class Win {
+    /**
+        Params:
+        data - Array to print
+        sizeToWrite - How many bytes write to handler.
+    */
+    func int printData(Array data, int sizeToWrite) {
+        var int stdOutCode, stdOutHandle, writtenBuff, resultCode, tmp;
+        let writtenBuff = alloc(1); // Allocate buffer for result bytes written.
+        let stdOutCode = -11;       // Constant for standard console write handler.
+        // Get std handler.
+        let stdOutHandle = win("GetStdHandle", stdOutCode);
+        // Write to console and get resultCode (!=0 is success)
+        let resultCode = win("WriteFile", stdOutHandle, data, sizeToWrite, writtenBuff, 0);
+        let tmp = free(writtenBuff);
+        return resultCode + 48; // 48 - '0';
+    }
+
+    // ptr      00 00 00 00 -> dword
+    // int      00 00       -> word
+    // char     00          -> byte
+    func int printInt(int dataNum) {
+        var char data;
+        var int i, rem, dataSize;
+        var bool isNeg;
+        var int writtenBuff, stdOutCode, stdOutHandle, resultCode, tmp;
+        let writtenBuff = alloc(1);
+        let stdOutCode = -11;
+        let stdOutHandle = win("GetStdHandle", stdOutCode);
+        let dataSize = 44;
+        let data = alloc(dataSize);
+        // -2147483648 -> 2147483647, 11 symbols max, 11 * 4 = 44
+
+        let i = dataSize - 2;
+        if (dataNum = 0) {
+            let data[0] = 48;
+            let dataSize = 4;
+        } else {
+            if (dataNum < 0) {
+                let dataNum = -dataNum;
+                let isNeg = true;
+            }
+            while (dataNum > 0) {
+                let rem = Math.getReminder(dataNum, 10);
+                let dataNum = dataNum / 10;
+                let data[i] = rem + 48;
+                let i = i - 4;
+            }
+            if (isNeg) {
+                let data[i] = 45; // '-'
+            }
+        }
+        let resultCode = win("WriteFile", stdOutHandle, data, dataSize, writtenBuff, 0);
+        let data[0] = 10;
+        let tmp = win("WriteFile", stdOutHandle, data, 1, writtenBuff, 0);
+        let tmp = free(writtenBuff);
+        let tmp = free(data);
+        return resultCode;
+    }
+}
