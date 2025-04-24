@@ -43,7 +43,6 @@ public class ParserEngine {
     private int index;
     private Token currentToken;
     private boolean wasReturn = false;
-    private boolean isNeedByteShift = false;
     private int errorCount = 0;
     private final long compilationTime;
     private final SymbolTable symbolTable;
@@ -462,9 +461,11 @@ public class ParserEngine {
         if (expectTokenValue(false, "[")) {
             acceptToken();
             writer.writePush(variable.getKind(), variable.getIndex());
-            isNeedByteShift = true;
             parseExpression();
-            isNeedByteShift = false;
+            if ("int".contentEquals(variable.getType())) {
+                writer.writeConstant("4");
+                writer.writeArithmetic(VMCommand.MULTIPLY);
+            }
             expectTokenValue("]"); acceptToken();
             writer.writeArithmetic(VMCommand.ADD);
             isArray = true;
@@ -680,11 +681,7 @@ public class ParserEngine {
             case INTEGER_CONSTANT: {
                 String numConst = currentToken.getValue();
                 acceptToken();
-                if (isNeedByteShift) {
-                    writer.writeConstant(numConst + "*4");
-                } else {
-                    writer.writeConstant(numConst);
-                }
+                writer.writeConstant(numConst);
                 break;
             }
             case STRING_CONSTANT: {
@@ -708,9 +705,11 @@ public class ParserEngine {
                     Variable variable = symbolTable.findVariable(name);
                     writer.writePush(variable.getKind(), variable.getIndex());
                     acceptToken(); // [
-                    isNeedByteShift = true;
                     parseExpression();
-                    isNeedByteShift = false;
+                    if ("int".contentEquals(variable.getType())) {
+                        writer.writeConstant("4");
+                        writer.writeArithmetic(VMCommand.MULTIPLY);
+                    }
                     expectTokenValue("]"); acceptToken();
                     writer.writeArithmetic(VMCommand.ADD);
                     next = getNextToken();
