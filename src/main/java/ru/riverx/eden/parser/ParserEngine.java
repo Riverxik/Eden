@@ -158,6 +158,17 @@ public class ParserEngine {
         asmCode.add("\tpush    eax");                // ; heap handle
         asmCode.add("\tcall    HeapFree");
         asmCode.add("\tjmp eden_return");
+        // Eden Append Char
+        asmCode.add("eden_append_char:");
+        asmCode.add(";; base adr, char, shift");
+        asmCode.add("\tmov dword [eden_r13], eax"); // ; save return address
+        asmCode.add("\tpop ecx");                   // ; shift
+        asmCode.add("\tpop ebx");                   // ; char
+        asmCode.add("\tpop eax");                   // ; base adr
+        asmCode.add("\tpush eax");
+        asmCode.add("\tadd eax, ecx");
+        asmCode.add("\tmov [eax], ebx");
+        asmCode.add("\tjmp [eden_r13]");
         // Eden inner Comparison EQ
         asmCode.add("eden_comp_eq:");
         asmCode.add("\tmov dword [eden_r13], eax");
@@ -551,13 +562,6 @@ public class ParserEngine {
     }
 
     private void parseExpression() {
-//        parseTerm();
-//        if (expectTokenValue(false, "+", "-", "*", "/", "&", "|", "<", ">", "=")) {
-//            expectTokenValue("+", "-", "*", "/", "&", "|", "<", ">", "=");
-//            char op = currentToken.getValue().charAt(0); acceptToken();
-//            parseExpression();
-//            writeOp(op, false);
-//        }
         part();
         sum();
         shift();
@@ -687,7 +691,7 @@ public class ParserEngine {
             case STRING_CONSTANT: {
                 String strConst = currentToken.getValue();
                 acceptToken();
-                parseString(strConst, strConst.length());
+                parseString(strConst);
                 break;
             }
             case KEYWORD: {
@@ -753,12 +757,13 @@ public class ParserEngine {
         }
     }
 
-    private void parseString(String inputStr, int length) {
-        writer.writePush(CONSTANT, length);
-        writer.writeCall("String.new", 1);
-        for (char c : inputStr.toCharArray()) {
-            writer.writePush(CONSTANT, c);
-            writer.writeCall("String.appendChar", 2); // 0 is String base address, 1 is char
+    private void parseString(String inputStr) {
+        writer.writePush(CONSTANT, inputStr.length());
+        writer.writeCall("eden_alloc", 1);
+        for (int i = 0; i < inputStr.length(); i++) {
+            writer.writePush(CONSTANT, inputStr.charAt(i));
+            writer.writePush(CONSTANT, i);
+            writer.writeCall("eden_append_char", 3); // 0 is String base address, 1 is char, 2 shift
         }
     }
 
