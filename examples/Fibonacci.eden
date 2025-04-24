@@ -1,0 +1,47 @@
+use "std\\Win.eden";
+
+class Fibonacci {
+
+    func void main() {
+        var int i, resCode;
+        let i = 0;
+        while (i < 20) {
+            let resCode = Win.printInt(calcFibonacci(i));
+            let resCode = Win.printInt(calcFibonacciLoop(i));
+            let i = i + 1;
+        }
+        return;
+    }
+
+    func int calcFibonacci(int n) {
+        var int prev, prev2;
+        if (n < 2) {
+            return 1;
+        }
+
+        let prev = calcFibonacci(n - 1);
+        let prev2 = calcFibonacci(n - 2);
+
+        return prev + prev2;
+    }
+
+    func int calcFibonacciLoop(int n) {
+        var int prev, prev2, i, curr;
+
+        if (n < 2) {
+            return 1;
+        }
+
+        let prev2 = 0;
+        let prev = 1;
+        let i = 0;
+        while (i < n) {
+            let curr = prev2 + prev;
+            let prev2 = prev;
+            let prev = curr;
+            let i = i + 1;
+        }
+
+        return curr;
+    }
+}
