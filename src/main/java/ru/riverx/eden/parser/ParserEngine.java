@@ -43,7 +43,6 @@ public class ParserEngine {
     private int index;
     private Token currentToken;
     private boolean wasReturn = false;
-    private boolean isNeedByteShift = false;
     private int errorCount = 0;
     private final long compilationTime;
     private final SymbolTable symbolTable;
@@ -131,7 +130,7 @@ public class ParserEngine {
         asmCode.add("\tmov dword [eden_arg], ebx");
         asmCode.add("\tsub dword [eden_arg], 4");
         asmCode.add("\tmov dword [eden_lcl], esp");
-        asmCode.add("; THINK DOWN HERE");
+        asmCode.add("; LOGIC HERE");
         asmCode.add("\tmov dword eax, [eden_arg]");
         asmCode.add("\tpush    dword [eax]");        // ; size
         asmCode.add("\tpush    8");                  // ; flags (0 = default, 8 = zeroing memory)
@@ -159,6 +158,40 @@ public class ParserEngine {
         asmCode.add("\tpush    eax");                // ; heap handle
         asmCode.add("\tcall    HeapFree");
         asmCode.add("\tjmp eden_return");
+        // Eden inner Comparison EQ
+        asmCode.add("eden_comp_eq:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tje eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Eden inner Comparison LT
+        asmCode.add("eden_comp_lt:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tjl eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Eden inner Comparison GT
+        asmCode.add("eden_comp_gt:");
+        asmCode.add("\tmov dword [eden_r13], eax");
+        asmCode.add("\tpop eax");
+        asmCode.add("\tpop ebx");
+        asmCode.add("\tcmp ebx, eax");
+        asmCode.add("\tjg eden_comp_success");
+        asmCode.add("\tjmp eden_comp_failure");
+        // Comparison failure
+        asmCode.add("eden_comp_failure:");
+        asmCode.add("\tpush 0");
+        asmCode.add("\tjmp eden_comp_end");
+        // Comparison success
+        asmCode.add("eden_comp_success:");
+        asmCode.add("\tpush -1");
+        asmCode.add("eden_comp_end:");
+        // Jump back from comparison
+        asmCode.add("\tjmp [eden_r13]");
         // call return label
         asmCode.add("eden_return:");
         // put return value that is on eax in [arg]
@@ -428,9 +461,11 @@ public class ParserEngine {
         if (expectTokenValue(false, "[")) {
             acceptToken();
             writer.writePush(variable.getKind(), variable.getIndex());
-            isNeedByteShift = true;
             parseExpression();
-            isNeedByteShift = false;
+            if ("int".contentEquals(variable.getType())) {
+                writer.writeConstant("4");
+                writer.writeArithmetic(VMCommand.MULTIPLY);
+            }
             expectTokenValue("]"); acceptToken();
             writer.writeArithmetic(VMCommand.ADD);
             isArray = true;
@@ -516,12 +551,128 @@ public class ParserEngine {
     }
 
     private void parseExpression() {
+//        parseTerm();
+//        if (expectTokenValue(false, "+", "-", "*", "/", "&", "|", "<", ">", "=")) {
+//            expectTokenValue("+", "-", "*", "/", "&", "|", "<", ">", "=");
+//            char op = currentToken.getValue().charAt(0); acceptToken();
+//            parseExpression();
+//            writeOp(op, false);
+//        }
+        part();
+        sum();
+        shift();
+        logical();
+        bitwise();
+    }
+
+    private void part() {
+        unary();
+    }
+
+    private void unary() {
+        Token t = tokens.get(index);
+        if (expectTokenValue(false, "+", "-")) {
+            acceptToken();
+        }
         parseTerm();
-        if (expectTokenValue(false, "+", "-", "*", "/", "&", "|", "<", ">", "=")) {
-            expectTokenValue("+", "-", "*", "/", "&", "|", "<", ">", "=");
-            char op = currentToken.getValue().charAt(0); acceptToken();
-            parseExpression();
-            writeOp(op, false);
+        if (t.getValue().equals("-")) {
+            writeOp('-', true);
+        }
+        starSlash();
+    }
+
+    private void starSlash() {
+        if (expectTokenValue(false, "*")) {
+            acceptToken();
+            unary();
+            writeOp('*', false);
+            starSlash();
+        }
+        if (expectTokenValue(false, "/")) {
+            acceptToken();
+            unary();
+            writeOp('/', false);
+            starSlash();
+        }
+    }
+
+    private void sum() {
+        if (expectTokenValue(false, "+")) {
+            acceptToken();
+            part();
+            writeOp('+', false);
+            sum();
+        }
+        if (expectTokenValue(false, "-")) {
+            acceptToken();
+            part();
+            writeOp('-', false);
+            sum();
+        }
+    }
+
+    private void shift() {
+        if (expectTokenValue(false, "<<")) {
+            acceptToken();
+            part();
+            sum();
+            writer.writeArithmetic(VMCommand.L_SHIFT);
+        }
+        if (expectTokenValue(false, ">>")) {
+            acceptToken();
+            part();
+            sum();
+            writer.writeArithmetic(VMCommand.R_SHIFT);
+        }
+    }
+
+    private void bitwise() {
+        if (expectTokenValue(false, "&")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            logical();
+            writeOp('&', false);
+        }
+        if (expectTokenValue(false, "|")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            logical();
+            writeOp('|', false);
+        }
+    }
+
+    private void logical() {
+        if (expectTokenValue(false, ">")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('>', false);
+        }
+        if (expectTokenValue(false, "<")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('<', false);
+        }
+        if (expectTokenValue(false, "=")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('=', false);
+        }
+        if (expectTokenValue(false, "~")) {
+            acceptToken();
+            part();
+            sum();
+            shift();
+            writeOp('~', false);
         }
     }
 
@@ -530,11 +681,7 @@ public class ParserEngine {
             case INTEGER_CONSTANT: {
                 String numConst = currentToken.getValue();
                 acceptToken();
-                if (isNeedByteShift) {
-                    writer.writeConstant(numConst + "*4");
-                } else {
-                    writer.writeConstant(numConst);
-                }
+                writer.writeConstant(numConst);
                 break;
             }
             case STRING_CONSTANT: {
@@ -558,9 +705,11 @@ public class ParserEngine {
                     Variable variable = symbolTable.findVariable(name);
                     writer.writePush(variable.getKind(), variable.getIndex());
                     acceptToken(); // [
-                    isNeedByteShift = true;
                     parseExpression();
-                    isNeedByteShift = false;
+                    if ("int".contentEquals(variable.getType())) {
+                        writer.writeConstant("4");
+                        writer.writeArithmetic(VMCommand.MULTIPLY);
+                    }
                     expectTokenValue("]"); acceptToken();
                     writer.writeArithmetic(VMCommand.ADD);
                     next = getNextToken();
@@ -681,9 +830,9 @@ public class ParserEngine {
             } break;
             case '*': writer.writeArithmetic(VMCommand.MULTIPLY); break;
             case '/': writer.writeArithmetic(VMCommand.DIVIDE); break;
-            case '=': writer.writeArithmetic(VMCommand.EQ); break;
-            case '<': writer.writeArithmetic(VMCommand.LT); break;
-            case '>': writer.writeArithmetic(VMCommand.GT); break;
+            case '=': writer.writeArithmetic(VMCommand.EQ, className+"_RT_" + getUniqueNumber()); break;
+            case '<': writer.writeArithmetic(VMCommand.LT, className+"_RT_" + getUniqueNumber()); break;
+            case '>': writer.writeArithmetic(VMCommand.GT, className+"_RT_" + getUniqueNumber()); break;
             case '&': writer.writeArithmetic(VMCommand.AND); break;
             case '|': writer.writeArithmetic(VMCommand.OR); break;
             case '~': writer.writeArithmetic(VMCommand.NOT); break;

@@ -26,18 +26,24 @@ public class VMWriter {
     }
 
     public void writeArithmetic(VMCommand cmd) {
+        writeArithmetic(cmd, null);
+    }
+
+    public void writeArithmetic(VMCommand cmd, String uniqueLabel) {
         switch (cmd) {
             case ADD: vmCode.add(new OpAdd()); break;
             case SUB: vmCode.add(new OpSub()); break;
             case NEG: vmCode.add(new OpNeg()); break;
-//            case EQ: vmCode.add("eq"); break;
-//            case GT: vmCode.add("gt"); break;
-//            case LT: vmCode.add("lt"); break;
-//            case AND: vmCode.add("and"); break;
-//            case OR: vmCode.add("or"); break;
-//            case NOT: vmCode.add("not"); break;
-//            case MULTIPLY: writeCall("Math.multiply", 2); break;
-//            case DIVIDE: writeCall("Math.divide", 2); break;
+            case EQ: vmCode.add(new OpEq(uniqueLabel)); break;
+            case GT: vmCode.add(new OpGt(uniqueLabel)); break;
+            case LT: vmCode.add(new OpLt(uniqueLabel)); break;
+            case AND: vmCode.add(new OpAnd()); break;
+            case OR: vmCode.add(new OpOr()); break;
+            case NOT: vmCode.add(new OpNot()); break;
+            case MULTIPLY: vmCode.add(new OpMul()); break;
+            case DIVIDE: vmCode.add(new OpDivide()); break;
+            case L_SHIFT: vmCode.add(new OpLeftShift()); break;
+            case R_SHIFT: vmCode.add(new OpRightShift()); break;
             default: throw new IllegalArgumentException("Not implemented cmd: " + cmd);
         }
     }
@@ -47,18 +53,15 @@ public class VMWriter {
     }
 
     public void writeLabel(String label) {
-        System.out.printf("write label: %s%n", label);
-        //vmCode.add("label " + label);
+        vmCode.add(new OpLabel(label));
     }
 
     public void writeGoto(String label) {
-        System.out.printf("Goto: %s%n", label);
-        //vmCode.add("goto " + label);
+        vmCode.add(new OpGoto(label));
     }
 
     public void writeIfGoto(String label) {
-        System.out.printf("If-goto: %s%n", label);
-        //vmCode.add("if-goto " + label);
+        vmCode.add(new OpIfGoto(label));
     }
 
     public void writeCall(String name, int nArgs) {

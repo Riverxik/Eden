@@ -32,7 +32,9 @@ public class OpPop implements VM2Asm {
                 sb.append("\tmov dword ebx, [eden_lcl]\n\tsub ebx, ").append((index+1)*4)
                         .append("\n\tmov dword [ebx], eax");
             } break;
-            // argument
+            case "argument": {
+                sb.append("\tmov dword ebx, [eden_arg]\n\tsub ebx, ").append(index*4).append("\n\tmov dword [ebx], eax");
+            } break;
             case "this": {
                 sb.append("\tmov dword ebx, [eden_this]\n\tadd ebx, ").append(index*4).append("\n\tmov dword [ebx], eax");
             } break;
