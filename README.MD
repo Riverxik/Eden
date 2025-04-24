@@ -11,7 +11,7 @@ Just because it's fun, and I can (can I?).
 
 Eden is planned to be:
 - [x] Compiled
-- [x] Turing-complete
+- [x] Turing-complete [Proof -> Rule110.eden](https://github.com/Riverxik/Eden/tree/master/examples/Rule110.eden)
 - [ ] Self-hosted (Java is used only as an initial bootstrap, once the language is mature enough I'm going to rewrite it in itself)
 
 The stuff required for be self-hosted (In my opinion):
