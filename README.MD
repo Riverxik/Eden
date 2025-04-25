@@ -9,9 +9,12 @@ Eden is object-oriented programming language written in Java.
 Main goal for this project is make a simple oop self-hosted language.
 Just because it's fun, and I can (can I?).
 
+![](https://i.imgur.com/5UBwvfG.gif)
+
 Eden is planned to be:
 - [x] Compiled
 - [x] Turing-complete [Proof -> Rule110.eden](https://github.com/Riverxik/Eden/tree/master/examples/Rule110.eden)
+- [x] Cool [Proof -> Donut.eden](https://github.com/Riverxik/Eden/tree/master/examples/Donut.eden)
 - [ ] Self-hosted (Java is used only as an initial bootstrap, once the language is mature enough I'm going to rewrite it in itself)
 
 The stuff required for be self-hosted (In my opinion):
