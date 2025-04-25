@@ -1,0 +1,169 @@
+use "std\\Win.eden";
+
+class Donut {
+
+    func void main() {
+        var char cls;
+        var char b, z;
+        var int symbolsInt;
+        var int bInt, zInt;
+        var int i, j, tmp, tmp1;
+        var int sA, cA, sB, cB, u;
+        var int sj, cj, si, ci;
+        var int R1, R2, K2;
+        var int x0, x1, x2, x3, x4, x5, x6, x7;
+        var int x, y, N, o, zz, zo, k, l;
+        let symbolsInt = alloc(12*4); // ".,-~:;=!*#$@"
+        let symbolsInt[0] = 46;
+        let symbolsInt[1] = 44;
+        let symbolsInt[2] = 45;
+        let symbolsInt[3] = 126;
+        let symbolsInt[4] = 58;
+        let symbolsInt[5] = 59;
+        let symbolsInt[6] = 61;
+        let symbolsInt[7] = 33;
+        let symbolsInt[8] = 42;
+        let symbolsInt[9] = 35;
+        let symbolsInt[10] = 36;
+        let symbolsInt[11] = 64;
+        // Clear screen esc sequence.
+        let cls = alloc(6);// \x1b[23A
+        let cls[0] = 10;
+        let cls[1] = 27;
+        let cls[2] = 91;
+        let cls[3] = 50;
+        let cls[4] = 51;
+        let cls[5] = 65;
+        // Init.
+        let bInt = alloc(1760*4);
+        let zInt = alloc(1760*4);
+        let b = alloc(1760);
+        let z = alloc(1760);
+        let sA = 1024;
+        let cA = 0;
+        let sB = 1024;
+        let cB = 0;
+        while (true) {
+            let tmp = 0;
+            while (tmp < 1760) {
+                let bInt[tmp] = 32; // ' '
+                let tmp = tmp + 1;
+            }
+            let tmp = 0;
+            while (tmp < 1760) {
+                let zInt[tmp] = 127; // 'del'
+                let tmp = tmp + 1;
+            }
+
+            let sj = 0;
+            let cj = 1024;
+            let j = 0;
+            while (j < 90) {
+                let si = 0;
+                let ci = 1024;
+                let i = 0;
+                while (i < 324) {
+                    let R1 = 1;
+                    let R2 = 2048;
+                    let K2 = 5242880; // 5120 * 1024
+
+                    let x0 = (R1 * cj) + R2;
+                    let x1 = (ci * x0) / 1024;
+                    let x2 = (cA * sj) / 1024;
+                    let x3 = (si * x0) / 1024;
+                    let x4 = (R1 * x2) - ((sA * x3) / 1024);
+
+                    let x5 = (sA * sj) / 1024;
+                    let x6 = K2 + (R1 * 1024 * x5) + (cA * x3);
+                    let x7 = (cj * si) / 1024;
+
+                    let x = 40 + ((30 * ((cB * x1) - (sB * x4))) / x6);
+                    let y = 12 + ((15 * ((cB * x4) + (sB * x1))) / x6);
+
+                    let N = (((((-cA * x7) - (cB * (((-sA * x7) / 1024) + x2))) - ((ci * (cj * sB)) / 1024)) / 1024) - x5) / 128;
+                    let o = x + (80 * y);
+                    let zz = (x6 - K2) / 32768;
+
+                    if (o > 0 & o < 1761) {
+                        let zo = zInt[o];
+                    } else {
+                        let zo = zInt[0];
+                    }
+
+                    if ((22 > y) & (y > 0) & (x > 0) & (80 > x) & (zz < zo)) {
+                        let zInt[o] = zz;
+                        if (N > 0) {
+                            let bInt[o] = symbolsInt[N]; // N = ".,-~:;=!*#$@"
+                        } else {
+                            let bInt[o] = symbolsInt[0];
+                        }
+                    }
+
+                    // Rotate i
+                    let u = ci;
+                    let tmp1 = (5 * si) / 256;
+                    let ci = ci - tmp1;
+                    let tmp1 = (5 * u) / 256;
+                    let si = si + tmp1;
+                    let tmp1 = 3145728 - (ci * ci) - (si * si);
+                    let u = tmp1 / 2048;
+                    let ci = (ci * u) / 1024;
+                    let si = (si * u) / 1024;
+
+                    let i = i + 1;
+                }
+                // Rotate j
+                let u = cj;
+                let tmp1 = (9 * sj) / 128;
+                let cj = cj - tmp1;
+                let tmp1 = (9 * u) / 128;
+                let sj = sj + tmp1;
+                let tmp1 = 3145728 - (cj * cj) - (sj * sj);
+                let u = tmp1 / 2048;
+                let cj = (cj * u) / 1024;
+                let sj = (sj * u) / 1024;
+
+                let j = j + 1;
+            }
+
+            let k = 0;
+            let l = 0;
+            while (k < 1760) {
+                if (l = 79) {
+                    let b[k] = 10;
+                    let l = 0;
+                } else {
+                    let b[k] = bInt[k];
+                    let l = l + 1;
+                }
+                let tmp = Win.printData(b + k, 1);
+                let k = k + 1;
+            }
+
+            let u = cA;
+            let tmp1 = (5 * sA) / 128;
+            let cA = cA - tmp1;
+            let tmp1 = (5 * u) / 128;
+            let sA = sA + tmp1;
+            let tmp1 = 3145728 - (cA * cA) - (sA * sA);
+            let u = tmp1 / 2048;
+            let cA = (cA * u) / 1024;
+            let sA = (sA * u) / 1024;
+
+            let u = cB;
+            let tmp1 = (5 * sB) / 256;
+            let cB = cB - tmp1;
+            let tmp1 = (5 * u) / 256;
+            let sB = sB + tmp1;
+            let tmp1 = 3145728 - (cB * cB) - (sB * sB);
+            let u = tmp1 / 2048;
+            let cB = (cB * u) / 1024;
+            let sB = (sB * u) / 1024;
+
+            let tmp = win("Sleep", 20); // sleepMs
+            let tmp = Win.printData(cls, 6); // clearScreen;
+        }
+
+        return;
+    }
+}
