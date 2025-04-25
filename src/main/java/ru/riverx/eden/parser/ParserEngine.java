@@ -638,6 +638,7 @@ public class ParserEngine {
             shift();
             logical();
             writeOp('&', false);
+            bitwise();
         }
         if (expectTokenValue(false, "|")) {
             acceptToken();
@@ -646,6 +647,7 @@ public class ParserEngine {
             shift();
             logical();
             writeOp('|', false);
+            bitwise();
         }
     }
 
